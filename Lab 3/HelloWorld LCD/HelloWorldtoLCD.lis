@@ -1,0 +1,23 @@
+ 0000           
+ 0000           ;Hello world on LCD display
+ 0000           
+ 0000           _main::
+ 0000           
+ 0000 160000                             jsr     INITLCD                ;initialize LCD
+ 0003 160000                             jsr     CURSOR                 ;show cursor
+ 0006           
+ 0006 8600                               ldaa #$00                      ;load accumulator with LCD address
+ 0008 CE0010                             ldx     #MESSAGE               ;load message in register x
+ 000B 160000                             jsr OUTSTRING
+ 000E                                    
+ 000E 20FE      CARTER:          bra CARTER
+ 0010           
+ 0010            
+ 0010           
+ 0010 68656C6C6F20776F726C64 MESSAGE:    .ascii   'hello world'            ;message to be displayed
+ 001B 00                                 .byte    $00
+ 001C           
+ 001C                                    
+                .area interrupt_vectors (abs)
+                          .org          $FFFE                                              ;at reset vector location,
+ FFFE 0000                .word         __start                                            ;load starting address       

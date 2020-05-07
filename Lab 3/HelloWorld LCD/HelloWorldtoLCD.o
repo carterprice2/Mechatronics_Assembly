@@ -1,0 +1,26 @@
+XH
+H 2 areas 5 global symbols
+M HelloWorldtoLCD.s
+S INITLCD Ref0000
+S OUTSTRING Ref0000
+S CURSOR Ref0000
+S __start Ref0000
+A text size 1C flags 0
+dbfile HelloWorldtoLCD.s
+dbfunc 0 ? 0 I
+dbline 6 0
+dbline 7 3
+dbline 9 6
+dbline A 8
+dbline B B
+dbline D E
+S _main Def0000
+A interrupt_vectors size 10000 flags C
+T 00 00 16 00 00 16 00 00 86 00 CE 00 10 16
+R 00 00 00 00 02 03 00 00 02 06 00 02 00 0B 00 00
+T 00 0C 00 00 20 FE 68 65 6C 6C 6F 20 77 6F 72 6C
+R 00 00 00 00 02 02 00 01
+T 00 1A 64 00
+R 00 00 00 00
+T FF FE 00 00
+R 00 00 00 01 02 02 00 03

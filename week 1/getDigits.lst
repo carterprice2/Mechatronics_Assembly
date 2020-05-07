@@ -1,0 +1,53 @@
+WARNING: EXTCODE CODE AREA DO NOT CONTAIN RELOCATED ADDRESSES.
+THIS WILL BE REMEDIED IN A LATER RELEASE.
+--- 0000           ;read a sequence of digits and store into the buffer
+--- 0000           
+--- 0000           ; RAM area
+                .area bss
+                
+ 0800            BUFFER::         .blkb 6
+ 0806            COUNT::          .blkb 1
+ 0807            POINTER::        .blkb 2
+ 0809            
+ 0809            ;============================================================================
+ 0809            
+ 0809            _main::
+ 0809            
+ 0809  16FE5C                    jsr INITKEY                                     ;initialize keypad
+ 080C  16FE71                    jsr FLUSH_BFR                           ;flushes the character input buffer
+ 080F  790806                    clr COUNT                                       
+ 0812  180308000807              movw  #BUFFER,POINTER           ;moves the contents of BUFFER into POINTER
+ 0818                            
+ 0818                            
+ 0818            LOOP:	
+ 0818  00                        bgnd
+ 0819  16FE77                    jsr     GETCHAR                                 ;the resulting ASCII char is put in accumulator B
+ 081C                            
+ 081C                                                                                            ;code to make sure it is a digit
+ 081C  C10A                      CMPB    #$0A                                    ;compares acc b to ent ascii value
+ 081E  2718                      BEQ             DONE                                    ;exits the loop
+ 0820  C130                      CMPB    #$30                                    ;compares acc b to 30
+ 0822  2DF4                      BLT             LOOP                                    ;branch to Loop if less than 30
+ 0824  C139                      CMPB    #$39                                    ;compares acc b to 39
+ 0826  2F02                      BLE             DIGIT                                   ;branches to digit
+ 0828  20EE                      BRA     LOOP                            ;branch always to not digit
+ 082A                            
+ 082A                            
+ 082A            DIGIT:	
+ 082A            		;stab 	BUFFER					;loads the contents of acc B into Buffer
+ 082A  FE0807                    ldx POINTER                                             ;loads acc X with pointer
+ 082D  6B00                      stab 0,X                                                ;Stores contents of acc B into the location of the address found in acc X which is POINTER
+ 082F  720806                    inc COUNT
+ 0832  08                        INX
+ 0833  7E0807                    stx POINTER
+ 0836  20E0                      bra LOOP
+ 0838                            
+ 0838            DONE:
+ 0838            
+ 0838  20FE                      bra DONE
+ 083A                            
+ 083A                            
+ 083A                            
+                .area interrupt_vectors (abs)
+                          .org          $FFFE                                              ;at reset vector location,
+ FFFE  C000                .word         __start                                            ;load starting address       

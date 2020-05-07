@@ -1,0 +1,25 @@
+WARNING: EXTCODE CODE AREA DO NOT CONTAIN RELOCATED ADDRESSES.
+THIS WILL BE REMEDIED IN A LATER RELEASE.
+--- 0000           
+--- 0000           ;Hello world on LCD display
+--- 0000           
+ C055            _main::
+ C055            
+ C055  16FB00                             jsr     INITLCD                ;initialize LCD
+ C058  16FC61                             jsr     CURSOR                 ;show cursor
+ C05B            
+ C05B  8600                               ldaa #$00                      ;load accumulator with LCD address
+ C05D  CEC065                             ldx     #MESSAGE               ;load message in register x
+ C060  16FBFE                             jsr OUTSTRING
+ C063                                     
+ C063  20FE      CARTER:          bra CARTER
+ C065            
+ C065             
+ C065            
+ C065  68656C6C6F20776F726C64 MESSAGE:    .ascii   'hello world'            ;message to be displayed
+ C070  00                                 .byte    $00
+ C071            
+ C071                                     
+                .area interrupt_vectors (abs)
+                          .org          $FFFE                                              ;at reset vector location,
+ FFFE  C000                .word         __start                                            ;load starting address       

@@ -1,0 +1,46 @@
+XH
+H 3 areas 8 global symbols
+M getDigits.s
+S INITKEY Ref0000
+S FLUSH_BFR Ref0000
+S __start Ref0000
+S GETCHAR Ref0000
+A text size 0 flags 0
+A bss size 3A flags 0
+dbfile getDigits.s
+dbfunc 0 ? 9 I
+dbline E 9
+dbline F C
+dbline 10 F
+dbline 11 12
+dbline 15 18
+dbline 16 19
+dbline 19 1C
+dbline 1A 1E
+dbline 1B 20
+dbline 1C 22
+dbline 1D 24
+dbline 1E 26
+dbline 1F 28
+dbline 24 2A
+dbline 25 2D
+dbline 26 2F
+dbline 27 32
+dbline 28 33
+dbline 29 36
+dbline 2D 38
+S _main Def0009
+S POINTER Def0007
+S COUNT Def0006
+S BUFFER Def0000
+A interrupt_vectors size 10000 flags C
+T 00 09 16 00 00 16 00 00 79 00 06 18 03
+R 00 00 00 01 02 03 00 00 02 06 00 01 00 09 00 01
+T 00 14 00 00 00 07 00 16 00 00 C1 0A 27 18 C1 30
+R 00 00 00 01 00 02 00 01 00 04 00 01 02 08 00 03
+T 00 22 2D F4 C1 39 2F 02 20 EE FE 00 07 6B 00 72
+R 00 00 00 01 00 0B 00 01
+T 00 30 00 06 08 7E 00 07 20 E0 20 FE
+R 00 00 00 01 00 02 00 01 00 06 00 01
+T FF FE 00 00
+R 00 00 00 02 02 02 00 02

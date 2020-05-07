@@ -1,0 +1,28 @@
+XH
+H 3 areas 6 global symbols
+M LAB1A_SC.s
+S __start Ref0000
+A text size 18 flags 0
+dbfile LAB1A_SC.s
+dbfunc 0 ? 0 I
+dbline A 0
+dbline B 1
+dbline C 6
+dbline D B
+dbline E E
+dbline F 11
+dbline 10 13
+dbline 12 16
+S _main Def0000
+S spin Def0016
+A bss size 3 flags 0
+S FIRST Def0000
+S SECOND Def0001
+S RESULT Def0002
+A interrupt_vectors size 10000 flags C
+T 00 00 00 18 0B 07 00 00 18 0B 06 00 01 B6 00 00
+R 00 00 00 00 00 06 00 01 00 0B 00 01 00 0E 00 01
+T 00 0E F6 00 01 18 06 7A 00 02 20 FE
+R 00 00 00 00 00 03 00 01 00 08 00 01
+T FF FE 00 00
+R 00 00 00 02 02 02 00 00

@@ -1,0 +1,121 @@
+ 0000           ;initial Display prompt
+ 0000           
+ 0000           ;RAM
+                .area bss
+                
+ 0000           TICKS::  .blkb 2
+ 0002           
+ 0002           ;===============================================================================
+ 0002           
+ 0002           
+                .area text
+                
+                
+                ;intial display upon start up "hub state"
+                
+ 0000           _main::
+ 0000 160000              jsr           INITLCD                    ;initalize the LCD   
+ 0003 160000    TOP:  jsr               CLRSCREEN                  ;clears the screen
+ 0006                     
+ 0006 8600                ldaa          #$00               ;loads the LCD address 
+ 0008 CE0072              ldx           #LINE1             ;starting address of string to be displayed
+ 000B 160000              jsr           OUTSTRING
+ 000E                    
+ 000E 8640                ldaa          #$40
+ 0010 CE008D              ldx           #LINE2             ;starting address of string to be displayed
+ 0013 160000              jsr           OUTSTRING
+ 0016                     
+ 0016           READDIS:
+ 0016           	  
+ 0016 160000              jsr           INITKEY            ;initialize keypad
+ 0019 160000              jsr           GETCHAR            ;get character
+ 001C C1F1                CMPB          #$F1
+ 001E 2718                BEQ           F1RES      ;branch to F1RESPONSE 
+ 0020 C1F2                CMPB          #$F2
+ 0022 2725                BEQ           F2RES      ;branch to F2RESPONSE
+ 0024 160000              jsr           CLRSCREEN
+ 0027 8600                ldaa          #$00
+ 0029 CE00A8              ldx           #ERROR
+ 002C 160000              jsr           OUTSTRING
+ 002F 00                  bgnd
+ 0030 16005A              jsr           DELAY
+ 0033 160000              jsr           OUTSTRING
+ 0036 20CB                bra           TOP
+ 0038                     
+ 0038                     
+ 0038                     
+ 0038           F1RES:
+ 0038 160000                                    jsr                     CLRSCREEN
+ 003B 8600                                      ldaa            #$00
+ 003D CE00C6                                    ldx                     #F1RESPONSE
+ 0040 160000                                    jsr             OUTSTRING
+ 0043 00                                        bgnd
+ 0044 16005A                                    jsr                     DELAY
+ 0047 20BA                                      bra                     TOP
+ 0049                                           
+ 0049           
+ 0049           F2RES:
+ 0049 160000                                    jsr                     CLRSCREEN
+ 004C 8600                                      ldaa            #$00
+ 004E CE00DF                                    ldx                     #F2RESPONSE
+ 0051 160000                                    jsr             OUTSTRING
+ 0054 16005A                                    jsr                     DELAY
+ 0057 00                                        bgnd
+ 0058 20A9                                      bra                     TOP
+ 005A                                           
+ 005A           ;===========================================================================
+ 005A                     
+ 005A           DELAY:
+ 005A 180301F40000              movw    #500, TICKS    ;load acc d with 4000
+ 0060 00                        bgnd
+ 0061           		LOOP:
+ 0061 1600F8                                    jsr   DELAY_1ms
+ 0064 FD0000                                    ldy       TICKS
+ 0067 8D0000                                    cpy   #0           ;compares d to 0
+ 006A 2705                                      beq       BYE      ;if equal to 0 exit
+ 006C 730000                                    dec       TICKS    ;decrement Ticks
+ 006F 20F0                                      bra       LOOP
+ 0071                                           
+ 0071           		BYE:
+ 0071 3D                                        rts                        ;exit DELAY
+ 0072                     
+ 0072           ;============================================================================    
+ 0072                    
+ 0072 4C4544207061697220313A20202020203C50726573732046313E LINE1:                       .ascii   'LED pair 1:     <Press F1>'
+ 008C 00                                        .byte    $00 
+ 008D                                           
+ 008D 4C4544207061697220323A20202020203C50726573732046323E LINE2:                       .ascii   'LED pair 2:     <Press F2>'
+ 00A7 00                                        .byte    $00 
+ 00A8           
+ 00A8 506C6561736520656E74657220612076616C696420726573706F6E7365 ERROR:                 .ascii   'Please enter a valid response'
+ 00C5 00                                        .byte    $00                    
+ 00C6                                           
+ 00C6 456E746572206D732064656C617920666F72204C45442031 F1RESPONSE:              .ascii   'Enter ms delay for LED 1'
+ 00DE 00                                        .byte    $00    
+ 00DF                                                                   
+ 00DF 456E746572206D732064656C617920666F72204C45442032 F2RESPONSE:              .ascii   'Enter ms delay for LED 2'
+ 00F7 00                                        .byte    $00                                                    
+ 00F8           ;=============================================================================
+ 00F8           ;
+ 00F8           ;    Subroutine Delay_1ms delays for ~1.00ms
+ 00F8           ;
+ 00F8           DELAY_1ms:
+ 00F8 CD0262            ldy    #$0262
+ 00FB           INNER:                            ; inside loop
+ 00FB 8D0000            cpy    #0
+ 00FE 2703              beq    EXIT
+ 0100 03                dey
+ 0101 20F8              bra    INNER
+ 0103           EXIT:
+ 0103 3D                rts                       ; exit DELAY_1ms
+ 0104           
+ 0104           ; end subroutine DELAY_1ms
+ 0104           ;
+ 0104           ;==============================================================================
+ 0104           
+ 0104           ;============================================================================
+ 0104                   
+                .area interrupt_vectors (abs)
+                          .org                          $FFFE
+ FFFE 0000                .word                         __start
+ 10000                                   

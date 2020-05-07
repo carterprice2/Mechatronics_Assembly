@@ -1,0 +1,22 @@
+                .area bss
+                
+ 0000           FIRST::         .blkb 01                                ; reserved space for addend
+ 0001           SECOND::        .blkb 01                                ; reserved space for augend
+ 0002           RESULT::        .blkb 01                                ; reserved space for result
+ 0003           
+                .area text
+                
+                
+ 0000 00        _main::   BGND
+ 0001 180B070000                  movb    #$07, FIRST
+ 0006 180B060001                  movb    #$06, SECOND
+ 000B B60000                      ldaa    FIRST
+ 000E F60001                      ldab    SECOND
+ 0011 1806                        aba
+ 0013 7A0002                      staa    RESULT
+ 0016                             
+ 0016 20FE      spin:: bra                spin
+ 0018           
+                .area interrupt_vectors(abs) 
+                          .org                                   $FFFE
+ FFFE 0000                .word                                  __start 

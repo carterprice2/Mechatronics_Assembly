@@ -1,0 +1,844 @@
+WARNING: EXTCODE CODE AREA DO NOT CONTAIN RELOCATED ADDRESSES.
+THIS WILL BE REMEDIED IN A LATER RELEASE.
+--- 0000           ;Sarah Visitacion
+--- 0000           ;L. Carter Price
+--- 0000           ;Lab 4 Function Generator 
+--- 0000           
+--- 0000           ;Assembler Equates
+--- 0000           
+ 0028           PORTJ = $0028
+ 0029           DDRJ =  $0029
+ 0010           PIN5 =	0b00010000
+--- 0000           
+ 0080           TIOS = $0080	  ;Timer I/O select register address
+ 0089           TCTL2 = $0089	  ;address timer control register
+ 008E           TFLG1 = $008E	  ;Timer flag register
+ 0084           TCNT = $0084	  ;timer count register high byte
+ 0085           TCNT2 = $0085	  ;timer count register low byte
+ 0090           TC0 = $0090		  ;timer channel 0 compare register
+ 008C           TMSK1 = $008C	  ;timer chan 0 interrupt enable bits
+ 0001           Chan0 = $01
+--- 0000           
+ 0301           DACAMSB = $0301	  ;the bit combo to send into msb of DAC
+ 0300           DACALSB = $0300   ;the bit combo to send into lsb of DAC
+--- 0000           
+--- 0000           
+                .area bss
+                
+ 0800            t1state::                 .blkb 1                       ;state variable for mastermind
+ 0801            t2state::                 .blkb 1                       ;state variable for Keypad
+ 0802            t3state::                 .blkb 1                       ;state variable for Display
+ 0803            t4state::                 .blkb 1                       ;state variable for Timer channel 0
+ 0804            t5state::                 .blkb 1                       ;state variable for Function Generator
+ 0805            TEMP::                    .blkb 1                       ;stores the key entered
+ 0806            key_flag::                .blkb 1                       ;indicates if a key is entered and in use
+ 0807            BACKflag::            .blkb 1                   ;backspace flag  NOT USED YET
+ 0808            ENTERflag::               .blkb 1                       ;if enter is pressed                                             
+ 0809            DPTR::                    .blkb 2                       ;address of next character to be read and displayed
+ 080B            FIRSTCH::                 .blkb 1               ;first character flag    
+ 080C            prompt_flag::     .blkb 1                       ;flag to set initial prompt screen 
+ 080D            BUFFER::                  .blkb 6                       ;stores the entered digit
+ 0813            POINTER::                 .blkb 2                       ;points to address of the next digit in buffer
+ 0815            COUNT::                   .blkb 1                       ;number of digits enterd                                                         *
+ 0816            wave::                    .blkb 1                       ;which wave 
+ 0817            DIGITflag::               .blkb 1                       ;flag to display digit
+ 0818            sawprompt_flag::  .blkb 1                       ;flag to display the saw wave prompt
+ 0819            bstate::                  .blkb 1                       ;the variable to track the movement through backspace
+ 081A            TOOHIGHflag::     .blkb 1                       ;flag to display too high error
+ 081B            ZEROflag::                .blkb 1                       ;flag for zero error
+ 081C            NODIGflag::               .blkb 1                       ;no digits entered flag
+ 081D            RESULT::                  .blkb 1                       ;stores the result of BCD to binary conversion                  
+ 081E            sineprompt_flag:: .blkb 1                       ;flag to dispaly sine 
+ 081F            squareprompt_flag::.blkb 1                      ;flag to display square
+ 0820            FIRSTdig::                .blkb 1                       ;indicates first digit is being printed
+ 0821            NINT::                    .blkb 1                       ;number of interrupts per BTI
+ 0822            WAVEPTR::                 .blkb 2                       ;add. of 1st line of data table
+ 0824            CSEG::                    .blkb 1                       ;# of segments remaining for selected wave
+ 0825            LSEG::                    .blkb 1                       ;# of BTIs remaining in this segment
+ 0826            SEGINC::                  .blkb 2                       ;16-bit segment increment 
+ 0828            CINT::                    .blkb 1                       ;# of interrupts remaining in this BTI
+ 0829            VALUE::                   .blkb 2                       ;16-bit DAC input value
+ 082B            SEGPTR::                  .blkb 2                       ;points to the current segment
+ 082D            NEWBTI::                  .blkb 1                       ;new basic time interval
+ 082E            RUN::                     .blkb 1                       ;flag to run fuction generator
+ 082F            INTERVAL::                .blkb 2                       ;the timer interrupt interval           
+ 0831            NINTOK::                  .blkb 1                       ;flag to let know that the NINT is valid                        
+ 0832            TINC::                    .blkb 2                       ;temporary var for increment calculation
+ 0834            
+                .area text
+                
+ C055  180B000800 _main::                  movb #$00, t1state    ;sets all initial states
+ C05A  180B000801                          movb #$00, t2state
+ C05F  180B000802                          movb #$00, t3state
+ C064  180B000803                          movb #$00, t4state
+ C069  180B000804                          movb #$00, t5state
+ C06E  180B000816                          movb #$00, wave
+ C073  180B000819                          movb #$00, bstate
+ C078  180B01080B                          movb #$01, FIRSTCH
+ C07D            TOP:  
+ C07D            			 
+ C07D  16C08E                              jsr TASK_1                    ;mastermind
+ C080  16C29E                              jsr TASK_2                    ;Keypad Driver
+ C083  16C2DA                              jsr TASK_3                    ;Display Driver
+ C086  16C4D2                              jsr TASK_4                    ;TIMER_C0
+ C089  16C538                              jsr TASK_5                    ;Function GEnerator
+ C08C  20EF                                bra TOP
+ C08E                                      
+ C08E                                       
+ C08E            ;============================================================================
+ C08E            
+ C08E            ;MASTERMIND        check all the variables                                                                                                                               
+ C08E            
+ C08E  B60800    TASK_1:         ldaa    t1state
+ C091  2711                              beq             INITscreen                              ;initialization state                                                                                                           
+ C093  43                                deca
+ C094  2724                              beq     Hubstate                                ;go to Hub state t1state = 1
+ C096  43                                deca
+ C097  2756                              beq             Digitstate                              ;if t1state=2 
+ C099  43                                deca
+ C09A  182700E3                          lbeq    backstate                               ;t1state = 3
+ C09E  43                                deca
+ C09F  18270131                          lbeq    enterstate                              ;t1state = 4
+ C0A3  3D                                rts
+ C0A4                                     
+ C0A4  180B01080C INITscreen:   movb  #$01, prompt_flag          ;sets the prompt flag
+ C0A9  180B01080B                          movb  #$01, FIRSTCH
+ C0AE  180B010800                          movb  #$01, t1state
+ C0B3  1803080D0813                        movw  #BUFFER, POINTER
+ C0B9  3D                                  rts
+ C0BA            
+ C0BA            Hubstate:	  	
+ C0BA  F70806                              tst   key_flag                                ;test if a key has been pressed
+ C0BD  182701DC                            lbeq   EXIT
+ C0C1  F60805                              ldab  TEMP                    
+ C0C4  C10A                                CMPB  #$0A                                    ;compares acc b to ent ascii value
+ C0C6  1827001F                            LBEQ  ENTERpress      
+ C0CA  C108                                CMPB  #$08                                    ;compare acc b to BACKSPACE ascii value
+ C0CC  18270013                            LBEQ  BACKSPACE               
+ C0D0  C130                                CMPB  #$30                                    ;compares acc b to 30
+ C0D2  182D002F                            LBLT  ERROR                                   ;branch to Loop if less than 30
+ C0D6  C139                                CMPB  #$39                                    ;compares acc b to 39
+ C0D8  182F0001                            LBLE  DIGITpress                              ;branches to digit
+ C0DC                                     
+ C0DC  3D                                  rts                      
+ C0DD                                            
+ C0DD                                      
+ C0DD                                      
+ C0DD  180B020800        DIGITpress:       movb#02, t1state                        ;set to digitstate
+ C0E2  3D                                          rts           
+ C0E3                                              
+ C0E3  180B030800        BACKSPACE:        movb#$03, t1state                       ;set to backstate  
+ C0E8  3D                                          rts   
+ C0E9                                              
+ C0E9  180B040800        ENTERpress:       movb #$04, t1state              ;set to enter state
+ C0EE  3D                                          rts
+ C0EF                                       
+ C0EF            Digitstate:	  
+ C0EF  F70816                                      tst  wave                                       ;test for wave
+ C0F2  2669                                        bne  DIGIT                              
+ C0F4  B60805                                      ldaa TEMP
+ C0F7  8030                                        suba #$30                                       ;subtract 30 from the digit entered
+ C0F9  270A                                        beq  ERROR                              ;branch to Error        
+ C0FB  43                                          deca 
+ C0FC  270B                                        beq  Sawtooth         
+ C0FE  43                                          deca
+ C0FF  2724                                        beq  Sine
+ C101  43                                          deca
+ C102  273D                                        beq  Square
+ C104  3D                                          rts
+ C105                                     
+ C105                                                      
+ C105                                                      
+ C105  18200182                  ERROR:            lbra clear
+ C109                                                      
+ C109                            
+ C109  180B010816                Sawtooth:         movb #01,  wave                               ;sets wave to sawtooth
+ C10E  180B010818                                          movb #$01, sawprompt_flag
+ C113  180B010820                                          movb #$01, FIRSTdig
+ C118  79082E                                              clr  RUN
+ C11B  1803C7020822                                        movw #SAWTOOTH, WAVEPTR
+ C121  18200166                                            lbra  clear
+ C125                                                      
+ C125                                                      
+ C125  180B020816                Sine:             movb #02,  wave                               ;sets wave to sine
+ C12A  180B01081E                                          movb #$01, sineprompt_flag
+ C12F  180B010820                                          movb #$01, FIRSTdig
+ C134  79082E                                              clr  RUN
+ C137  1803C70B0822                                        movw #SINE, WAVEPTR
+ C13D  1820014A                                            lbra clear
+ C141                                                      
+ C141                                                      
+ C141  180B030816                Square:           movb #03,  wave                               ;sets wave to Square
+ C146  180B01081F                                          movb #$01, squareprompt_flag
+ C14B  180B010820                                          movb #$01, FIRSTdig
+ C150  79082E                                              clr  RUN
+ C153  1803C7230822                                        movw #SQUARE, WAVEPTR
+ C159  1820012E                                            lbra clear
+ C15D                                                      
+ C15D            		DIGIT:		  
+ C15D  180B010817                                          movb  #$01, DIGITflag                 ;sets the digit flag 
+ C162  F60815                                              ldab  COUNT                               ;places current LCD address in accumulator A
+ C165  C103                                                cmpb  #$03                                ;makes sure don't type more than 3 digits
+ C167  1827011B                                            lbeq  MAXdig                              ;clears dig flag so typing stops
+ C16B  F60805                                              ldab  TEMP
+ C16E  FE0813                                              ldx   POINTER                                 ;loads acc X with pointer
+ C171  6B00                                                stab  0,X                                             ;Stores contents of acc B into the location of the address found in acc X which is POINTER
+ C173  720815                                              inc   COUNT
+ C176  08                                                  INX
+ C177  7E0813                                              stx   POINTER
+ C17A  790806                                              clr   key_flag
+ C17D  18200116                                            lbra  End
+ C181                                     
+ C181                                     
+ C181  B60819            backstate:              ldaa bstate
+ C184  2704                                              beq  accounting
+ C186  43                                                deca 
+ C187  2725                                              beq  wait
+ C189  3D                                                rts
+ C18A                                                    
+ C18A  180B010807                accounting: movb #$01, BACKflag                         ;sets the backspace flag
+ C18F  F60815                                            ldab COUNT                                          ;makes sure that you can't backspace past 0
+ C192  C100                                              cmpb #$00                                          
+ C194  2730                                              beq  NOBS                                           ;moves the pointer to account for backspace
+ C196  FE0813                                            ldx  POINTER                                    ;load POINTER into X
+ C199  09                                                dex                                                                             
+ C19A  6900                                              clr  0,X                                                ;clears the value stored at the address in X
+ C19C  730815                                            dec  COUNT
+ C19F  7E0813                                            stx  POINTER
+ C1A2  180B010819                                        movb #01, bstate
+ C1A7  790805                                            clr  TEMP
+ C1AA  790806                                            clr  key_flag
+ C1AD  3D                                                rts
+ C1AE                                                    
+ C1AE  F60807                    wait:           ldab BACKflag
+ C1B1  C103                                              cmpb #$03
+ C1B3  2701                                              beq      moveon
+ C1B5  3D                                                rts
+ C1B6                                                    
+ C1B6  180B000807                                moveon: movb #00,BACKflag                       ;resets backspace
+ C1BB  180B010800                                                movb #01, t1state
+ C1C0  180B000819                                                movb #$00, bstate 
+ C1C5  3D                                                        rts  
+ C1C6                    
+ C1C6  180B000807                NOBS:           movb #$00, BACKflag                             ;resets the backspace if the count is too low
+ C1CB  180B010800                                        movb #$01, t1state
+ C1D0  790806                                            clr  key_flag
+ C1D3  3D                                                rts
+ C1D4                                                    
+ C1D4            enterstate: 		
+ C1D4  1803080D0813                              movw  #BUFFER, POINTER                          ;moves address of buffer to pointer
+ C1DA  79081D                                    clr   RESULT                                            ;clears result
+ C1DD  F70815                                    tst   COUNT
+ C1E0  275B                                      beq       NODIG
+ C1E2  87                                        clra                                       
+ C1E3  C7                                        clrb
+ C1E4  00                                        bgnd
+ C1E5                                                    
+ C1E5            		LOOP1:	
+ C1E5  87                                        clra
+ C1E6  C7                                        clrb
+ C1E7  860A                                      ldaa #$0A                                  ;loads 10 in register a
+ C1E9  F6081D                                    ldab RESULT                            ;loads result in acc d
+ C1EC  12                                        mul                                        ;multiplies a * b stores low in b high in y
+ C1ED  8100                                      cmpa #$00                                  ;
+ C1EF  261E                                      bne      TOOBIG                            ;brances to toobig if carry flag set
+ C1F1  7B081D                    OK:             stab RESULT                                ;stores acc into result
+ C1F4  FE0813                                    ldx      POINTER                           ;loads pointer into x
+ C1F7  E600                                      ldab 0,X                                   ;loads b with contents of address stored in x
+ C1F9  C030                                      subb #$30                                  ;subtracts 30 from b
+ C1FB  FB081D                                    addb RESULT                                ;add acc b and RESULT
+ C1FE                                            
+ C1FE  7B081D                                    stab RESULT                                ;stores acc d in result
+ C201  730815                                    dec      COUNT                             ;decrement count
+ C204                                                    
+ C204  F70815                                    tst COUNT                                  ;tests count to see if 0
+ C207  274B                                      beq     DONE1
+ C209                                            
+ C209  08                                        inx                                                ;increments x
+ C20A  7E0813                                    stx     POINTER                            ;stores contents of x in pointer
+ C20D  20D6                                      bra LOOP1
+ C20F                                            
+ C20F            TOOBIG:		 			 				   ;sets the magnitude too high flag
+ C20F  180B01081A                                movb #$01, TOOHIGHflag
+ C214  180B010800                                movb #$01, t1state
+ C219  790805                                    clr  TEMP
+ C21C  790815                                    clr  COUNT
+ C21F  1803080D0813                              movw #BUFFER, POINTER      ;resets POINTER
+ C225  3D                                        rts
+ C226                                            
+ C226  180B01081B ZERO:                  movb #$01, ZEROflag                ;sets the zero flag
+ C22B  180B010800                                movb #$01, t1state                 ;returns to hub stae
+ C230  790805                                    clr  TEMP
+ C233  790815                                    clr COUNT
+ C236  1803080D0813                              movw #BUFFER, POINTER      ;resets the POINTER
+ C23C  3D                                        rts
+ C23D                                            
+ C23D  180B01081C NODIG:                 movb #$01, NODIGflag       ;sets the no digits entered flag
+ C242  180B010800                                movb #$01, t1state
+ C247  790805                                    clr  TEMP
+ C24A  790815                                    clr  COUNT
+ C24D  1803080D0813                              movw #BUFFER, POINTER      ;resets the POINTER
+ C253  3D                                        rts             
+ C254                    
+ C254            DONE1:								       ;finishes the BCD conversion
+ C254  C600                                      ldab #$00                                  ;loads 0 into acc d
+ C256  F1081D                                    cmpb RESULT                                ;compares d to result
+ C259  27CB                                      beq  ZERO                                  ;if result is 0 branch to Zero
+ C25B  180C081D0821                              movb RESULT, NINT
+ C261  180B010831                                movb #$01, NINTOK                  ;sets NINTOK
+ C266  180B01082E                                movb #$01, RUN                     ;sets RUN
+ C26B  790806                                    clr  key_flag
+ C26E  180B010800                                movb #01, t1state                  ;return to hub
+ C273  790816                                    clr  wave                                  ;clears variables used
+ C276  790805                                    clr  TEMP
+ C279  79081D                                    clr  RESULT
+ C27C  790815                                    clr  COUNT
+ C27F  1803080D0813                              movw #BUFFER, POINTER
+ C285  3D                                        rts                                
+ C286            
+ C286  790817                    MAXdig:          clr DIGITflag             ;clears the digit flag, so no typing
+ C289  2000                                               bra clear
+ C28B                                                     
+ C28B                                    
+ C28B  790806                    clear:           clr key_flag
+ C28E  790805                                             clr TEMP
+ C291  180B010800                                         movb #$01, t1state
+ C296  3D                                                 rts              
+ C297            		End:		  
+ C297            		
+ C297  180B010800                                         movb #$01, t1state    ;return to hubstate
+ C29C  3D                                                 rts
+ C29D                                                      
+ C29D                            
+ C29D  3D        EXIT:                   rts     
+ C29E            ;=============================================================================
+ C29E            
+ C29E            ;keypad driver
+ C29E            
+ C29E  B60801    TASK_2:           ldaa  t2state
+ C2A1  2707                                beq   initKEY
+ C2A3  43                                  deca 
+ C2A4  2713                                beq   t2state1
+ C2A6  43                                  deca
+ C2A7  2726                                beq   t2state2
+ C2A9  3D                                  rts
+ C2AA                                      
+ C2AA                                                                                            ;t2state0
+ C2AA  16FE67            initKEY:  jsr   KP_ACTIVE                       ;initializes the keypad 
+ C2AD  16FE5C                              jsr   INITKEY
+ C2B0  16FE71                              jsr   FLUSH_BFR
+ C2B3  180B010801                          movb  #$01,t2state            ;t2state to 1
+ C2B8  3D                                  rts
+ C2B9                                      
+ C2B9  F70BB1            t2state1: tst   L$KEY_FLG                       ;test key available flag t2state1
+ C2BC  261B                                bne   SKIP                                    
+ C2BE  16FE77                              jsr   GETCHAR                         ;gets the character entered, stores in b 
+ C2C1  7B0805                              stab  TEMP                            ;stores the contents of b in temp
+ C2C4  180B010806                          movb  #$01, key_flag
+ C2C9  180B020801                          movb  #02, t2state
+ C2CE  3D                                  rts
+ C2CF                                      
+ C2CF  F70806            t2state2: tst   key_flag                        ;when key_flag clears can accept next key
+ C2D2  2605                                bne   SKIP
+ C2D4  180B010801                          movb  #$01, t2state
+ C2D9                                    
+ C2D9  3D                SKIP:     rts                                           ;returns to subroutine
+ C2DA                    
+ C2DA            ;===============================================================================                                                                                                                                                         
+ C2DA            
+ C2DA            ;Display
+ C2DA            
+ C2DA            TASK_3:																														
+ C2DA  B60802                            ldaa t3state
+ C2DD  2731                              beq      initDIS
+ C2DF  43                                deca 
+ C2E0  273A                              beq      t3state1                           ;display hub        t3state = 1                                                                                                                                                                                                                                                                                             
+ C2E2  43                                deca
+ C2E3  18270099                          lbeq t3state2                           ;initial prompt
+ C2E7  43                                deca
+ C2E8  182700A8                          lbeq t3state3                           ;sawtooth prompt
+ C2EC  43                                deca
+ C2ED  182700B7                          lbeq t3state4                           ;sine prompt
+ C2F1  43                                deca
+ C2F2  182700C6                          lbeq t3state5                           ;square prompt
+ C2F6  43                                deca 
+ C2F7  182700D5                          lbeq t3state6                           ;echo
+ C2FB  43                                deca
+ C2FC  182700F7                          lbeq  t3state7                          ;backspace
+ C300  43                                deca
+ C301  1827016D                          lbeq  t3state8                          ;too high
+ C305  43                                deca  
+ C306  18270180                          lbeq  t3state9                          ;zero magnitude
+ C30A  43                                deca
+ C30B  18270193                          lbeq  t3state10                         ;no digits entered  
+ C30F  3D                                rts
+ C310                                    
+ C310  16FB00    initDIS:        jsr INITLCD                                     ;intializes the display
+ C313  16FC37                            jsr CLRSCREEN                           ;t3state0               
+ C316  180B010802                        movb #$01, t3state                      ;sets to state 1                                                                                                                                                                                                        
+ C31B  3D                                rts
+ C31C            
+ C31C            ;DISPLAY HUB
+ C31C            t3state1:	   							;Display hub test for variales
+ C31C            
+ C31C  F7080C                            tst prompt_flag                         
+ C31F  2629                              bne     prompt
+ C321  F70818                            tst sawprompt_flag
+ C324  262A                              bne Sawprompt
+ C326  F7081E                            tst sineprompt_flag
+ C329  262B                              bne Sineprompt
+ C32B  F7081F                            tst     squareprompt_flag
+ C32E  262C                              bne Squareprompt
+ C330  F70817                            tst DIGITflag
+ C333  262D                              bne ECHO
+ C335  F70807                            tst BACKflag
+ C338  262E                              bne back
+ C33A  F7081A                            tst TOOHIGHflag
+ C33D  262F                              bne toohigh
+ C33F  F7081B                            tst     ZEROflag
+ C342  2630                              bne zero
+ C344  F7081C                            tst NODIGflag
+ C347  2631                              bne nodig
+ C349  3D                                rts
+ C34A            
+ C34A            
+ C34A  180B020802        prompt:                 movb #$02, t3state
+ C34F  3D                                                rts 
+ C350  180B030802        Sawprompt:      movb #$03, t3state
+ C355  3D                                                rts
+ C356  180B040802        Sineprompt:             movb #$04, t3state
+ C35B  3D                                                rts
+ C35C  180B050802        Squareprompt:   movb #$05, t3state
+ C361  3D                                                rts
+ C362  180B060802        ECHO:                   movb #$06, t3state
+ C367  3D                                                rts
+ C368  180B070802        back:                   movb #$07, t3state
+ C36D  3D                                                rts
+ C36E  180B080802        toohigh:                movb #$08, t3state
+ C373  3D                                                rts
+ C374  180B090802        zero:                   movb #$09, t3state
+ C379  3D                                                rts
+ C37A  180B0A0802        nodig:                  movb #$0A, t3state
+ C37F  3D                                                rts
+ C380                                    
+ C380            t3state2:		   	 	   		   ;initial display
+ C380  F7080B                             tst    FIRSTCH            ;test if the first character is true
+ C383  182700AF                           lbeq   DCHAR
+ C387  8600                               ldaa   #$00               ;loads the LCD address 
+ C389                                     
+ C389  CEC5F5                             ldx    #PROMPT            ;starting address of string to be displayed
+ C38C  16C42D                             jsr    DCHAR_1st
+ C38F  182000B1                           lbra   BOTTOM
+ C393  3D                                 rts
+ C394                                     
+ C394            t3state3:	 			  	 	   ;Sawtooth prompt 
+ C394  F7080B                             tst    FIRSTCH            ;test if the first character is true
+ C397  1827009B                           lbeq   DCHAR
+ C39B  8640                               ldaa   #$40               ;loads the LCD address 
+ C39D  CEC612                             ldx    #SAWPROMPT         ;starting address of string to be displayed
+ C3A0  16C42D                             jsr    DCHAR_1st
+ C3A3  1820009D                           lbra   BOTTOM
+ C3A7  3D                                 rts
+ C3A8            
+ C3A8            t3state4:	 			  	 	   ;Sawtooth prompt 
+ C3A8  F7080B                             tst    FIRSTCH            ;test if the first character is true
+ C3AB  18270087                           lbeq   DCHAR
+ C3AF  8640                               ldaa   #$40               ;loads the LCD address 
+ C3B1  CEC63A                             ldx    #SINEPROMPT        ;starting address of string to be displayed
+ C3B4  16C42D                             jsr    DCHAR_1st
+ C3B7  18200089                           lbra   BOTTOM
+ C3BB  3D                                 rts
+ C3BC            
+ C3BC            t3state5:	 			  	 	   ;Sawtooth prompt 
+ C3BC  F7080B                             tst    FIRSTCH            ;test if the first character is true
+ C3BF  18270073                           lbeq   DCHAR
+ C3C3  8640                               ldaa   #$40               ;loads the LCD address 
+ C3C5  CEC662                             ldx    #SQUAREPROMPT  ;starting address of string to be displayed
+ C3C8  16C42D                             jsr    DCHAR_1st
+ C3CB  18200075                           lbra   BOTTOM
+ C3CF  3D                                 rts
+ C3D0                                     
+ C3D0  F70820    t3state6:        tst    FIRSTdig                   ;ECHO state
+ C3D3  2602                               bne    Ddigit_1st
+ C3D5  200B                               bra    Ddigit                                     
+ C3D7            
+ C3D7  8652              Ddigit_1st:     ldaa #$52                          ;sets the address to display the first digit
+ C3D9  16FC43                                    jsr SETADDR
+ C3DC  16FC61                                    jsr CURSOR
+ C3DF  790820                                    clr FIRSTdig
+ C3E2                                    
+ C3E2  F60805            Ddigit:          ldab TEMP                         ;displays a digit at a time
+ C3E5  16FC25                                     jsr OUTCHAR
+ C3E8  790805                                     clr TEMP
+ C3EB  790806                                     clr key_flag   
+ C3EE  790817                                     clr DIGITflag
+ C3F1  180B010802                                 movb #01, t3state         ;return to hub ALWAYS                                   
+ C3F6  3D                                         rts
+ C3F7                                            
+ C3F7                                            
+ C3F7  B60807    t3state7:               ldaa  BACKflag
+ C3FA  43                                        deca  
+ C3FB  2704                                      beq   b1
+ C3FD  43                                        deca
+ C3FE  2712                                      beq       b2
+ C400  3D                                        rts
+ C401                                            
+ C401  16FCFF                            b1: jsr LOAD_ADDR                  ;load current address in acc A
+ C404  8001                                      SUBA #$01                          ;subtract 1 from address
+ C406  16FC43                                    jsr SETADDR
+ C409  16FC61                                    jsr CURSOR
+ C40C  180B020807                                movb #$02, BACKflag
+ C411  3D                                        rts
+ C412                                            
+ C412  C620                              b2: ldab #$20                      ;load space into B
+ C414  16FC25                                    jsr  OUTCHAR               ;prints character in B
+ C417  16FCFF                                    jsr LOAD_ADDR              ;load current address in acc A
+ C41A  8001                                      SUBA #$01       
+ C41C  16FC43                                    jsr SETADDR
+ C41F  16FC61                                    jsr CURSOR      
+ C422  180B030807                                movb #$03, BACKflag
+ C427  180B010802                                movb #$01, t3state         ;return to hubstate
+ C42C  3D                                        rts
+ C42D            
+ C42D              	  DCHAR_1st: 	
+ C42D  7E0809                                    STX DPTR                           ;store contents of X in DPTR
+ C430  16FC43                                    jsr SETADDR                        ;set the address of of cursor to current location
+ C433  79080B                                    clr FIRSTCH                        ;clear variable FIRSTCH
+ C436                      
+ C436              	  DCHAR:
+ C436  FE0809                                    ldx DPTR                           ;load x with DPTR
+ C439  E600                                      ldab 0,x                           ;load acc b with contents of the address located in X
+ C43B  270D                                      beq DONE                   
+ C43D  16FC25                                    jsr OUTCHAR
+ C440  08                                        inx
+ C441  7E0809                                    stx DPTR
+ C444                                    
+ C444              	  BOTTOM:		
+ C444  F7080B                                    tst FIRSTCH                        ;test if firstchar entered for another string
+ C447  2608                                      bne RTNHUB                         ;branch to done 
+ C449  3D                                        rts
+ C44A                                    
+ C44A                  DONE:		
+ C44A  180B01080B                                movb #$01, FIRSTCH
+ C44F  20F3                                      bra BOTTOM
+ C451                                    
+ C451  79080C          RTNHUB:   clr  prompt_flag
+ C454  180B010802                                movb #$01, t3state         ;sets back to hub state
+ C459  F7081A                                    tst TOOHIGHflag
+ C45C  2625                                      bne t3s8b
+ C45E  F7081B                                    tst ZEROflag
+ C461  2638                                      bne t3s9b
+ C463  F7081C                                    tst NODIGflag
+ C466  264B                                      bne t3s10b
+ C468  790818                                    clr sawprompt_flag
+ C46B  79081E                                    clr sineprompt_flag
+ C46E  79081F                                    clr squareprompt_flag
+ C471  3D                                        rts
+ C472            t3state8:		   	 			   	   ;too high display
+ C472  F7080B                     tst    FIRSTCH
+ C475  1827FFBD                   lbeq   DCHAR
+ C479  8640                       ldaa   #$40
+ C47B  CEC68A                     ldx    #HIGH
+ C47E  16C42D                     jsr    DCHAR_1st
+ C481  20C1                       bra    BOTTOM
+ C483                                                     
+ C483  79081A            t3s8b:   clr TOOHIGHflag
+ C486  16C4BA                             jsr ClearError
+ C489  3D                                 rts     
+ C48A            
+ C48A            t3state9:			   				   ;zero magnitude display
+ C48A  F7080B                     tst    FIRSTCH
+ C48D  1827FFA5                   lbeq   DCHAR
+ C491  8640                       ldaa   #$40
+ C493  CEC6B2                     ldx    #ZEROMAG
+ C496  16C42D                     jsr    DCHAR_1st
+ C499  20A9                       bra    BOTTOM
+ C49B                                     
+ C49B            	t3s9b:
+ C49B  79081B                             clr ZEROflag
+ C49E  16C4BA                             jsr ClearError
+ C4A1  3D                                 rts    
+ C4A2                             
+ C4A2            t3state10:			   				   ;no digits entered display
+ C4A2  F7080B                     tst    FIRSTCH
+ C4A5  1827FF8D                   lbeq   DCHAR
+ C4A9  8640                       ldaa   #$40
+ C4AB  CEC6DA                     ldx    #NODIGIT
+ C4AE  16C42D                     jsr    DCHAR_1st
+ C4B1  2091                       bra    BOTTOM
+ C4B3                                     
+ C4B3  79081C            t3s10b:  clr NODIGflag
+ C4B6  16C4BA                             jsr ClearError
+ C4B9  3D                                 rts
+ C4BA                                            
+ C4BA            ClearError:		 		   			   ;resets variables and flags after error is displayed
+ C4BA  790805                             clr  TEMP                                 ;error message clears when a new wave is selected
+ C4BD  790818                             clr  sawprompt_flag
+ C4C0  79081E                             clr  sineprompt_flag
+ C4C3  79081F                             clr  squareprompt_flag
+ C4C6  790816                             clr  wave
+ C4C9  790806                             clr  key_flag
+ C4CC  180B010802                         movb #01, t3state
+ C4D1  3D                                 rts
+ C4D2            
+ C4D2            ;==============================================================================
+ C4D2            ;timer channel 0
+ C4D2            
+ C4D2  B60803    TASK_4:            ldaa t4state
+ C4D5  2703                                 beq  Setup
+ C4D7  43                                   deca
+ C4D8  2733                                 beq  Donothing
+ C4DA            	Setup:
+ C4DA            		  	   			 ;set-up code
+ C4DA            			
+ C4DA  18030320082F                      movw #$0320, INTERVAL    ;sets interval to 800
+ C4E0            
+ C4E0  1C002810                          bset PORTJ, PIN5                        ;closed latch
+ C4E4  1C002910                          bset DDRJ,  PIN5                        ; sets PORTJ to output from PIN5 
+ C4E8                                     
+ C4E8  1C008001                          bset TIOS, Chan0                 ;sets timer ch0 for output compare
+ C4EC  1C008901                          bset TCTL2, Chan0                ;sets to toggle
+ C4F0  1C008E01                          bset TFLG1, Chan0                ;clears the output compare flag
+ C4F4  10EF                              CLI                                              ;clears th interrupt mask
+ C4F6  1C008C01                          bset TMSK1, Chan0                ;enables output compare interrupts
+ C4FA                                    
+ C4FA                                                            ;step 3 generates the first interrupt 
+ C4FA            
+ C4FA  1C0086A0                          bset $0086, $A0                  ;enables timer and sets to stop in background mode
+ C4FE  FC0084                            ldd TCNT                                 ;reads timer channel- load acc d
+ C501  F3082F                            ADDD INTERVAL                    ;adds interval to timer
+ C504  7C0090                            STD      TC0
+ C507  180B010803                        movb #$01, t4state
+ C50C  3D                                rts
+ C50D            
+ C50D  3D                Donothing: rts
+ C50E                    
+ C50E                    
+ C50E            	TC0_ISR:
+ C50E            		
+ C50E  F7082E                    tst RUN
+ C511  270B                      beq NOT_YET
+ C513  730828                    dec CINT
+ C516  2714                      beq RESET
+ C518  FC0829                    ldd VALUE
+ C51B  16C73B                    jsr OUTDAC
+ C51E                            
+ C51E            	NOT_YET:	  			  	;reset timer
+ C51E            		
+ C51E  FC0090                    ldd  TC0                                ;read TC0
+ C521  F3082F                    ADDD INTERVAL                   ;adds interval to TC0
+ C524  7C0090                    std      TC0                            ;stores new value in TC0
+ C527  1C008E01                  bset TFLG1, Chan0               ;clears the interrupt flag
+ C52B  0B                        rti
+ C52C                    
+ C52C            	RESET:
+ C52C  180C08210828              movb NINT, CINT
+ C532  180B01082D                movb#$01, NEWBTI        
+ C537  0B                        rti
+ C538                            
+ C538            ;==============================================================================
+ C538            
+ C538            ;Function Generator     NEEDS WORK
+ C538            
+ C538  B60804    TASK_5:   ldaa t5state
+ C53B  270D                        beq  t5state0
+ C53D  43                          deca 
+ C53E  2715                        beq  t5state1
+ C540  43                          deca
+ C541  271D                        beq  t5state2
+ C543  43                          deca
+ C544  2740                        beq  t5state3
+ C546  43                          deca 
+ C547  2755                        beq  t5state4
+ C549  3D                          rts
+ C54A                             
+ C54A  180B01082D t5state0: movb #$01, NEWBTI     ;sets new BTI
+ C54F  180B010804                  movb #$01, t5state     ;initialize
+ C554  3D                          rts 
+ C555            t5state1:
+ C555  F70816                      tst  wave
+ C558  2705                        beq  t5s1a
+ C55A  180B020804                  movb #$02, t5state
+ C55F  3D        t5s1a:    rts
+ C560            
+ C560            
+ C560            t5state2:                       ; NEW WAVE
+ C560  FE0822            ldx    WAVEPTR          ; point to start of data for wave
+ C563  180D000824         movb   0,X, CSEG        ; get number of wave segments
+ C568  1805010829         movw   1,X, VALUE       ; get initial value for DAC
+ C56D  180D030825         movb   3,X, LSEG        ; load segment length
+ C572  1805040826         movw   4,X, SEGINC      ; load segment increment
+ C577  08                inx                     ; inc SEGPTR to next segment
+ C578  08                inx
+ C579  08                inx
+ C57A  08                inx
+ C57B  08                inx
+ C57C  08                inx
+ C57D  7E082B            stx    SEGPTR           ; store incremented SEGPTR for next segment
+ C580  180B030804         movb   #$03, t5state    ; set next state
+ C585  3D        t5s2a:  rts
+ C586            
+ C586            
+ C586            t5state3:
+ C586            		 
+ C586  F7082E                     tst   RUN
+ C589  2601                       bne   move
+ C58B  3D                         rts
+ C58C                             
+ C58C  F70831    move:    tst   NINTOK
+ C58F  270C                       beq   leave
+ C591  180B040804                 movb  #04, t5state
+ C596  180C08210828               movb  NINT, CINT
+ C59C  3D                         rts
+ C59D  3D        leave:   rts
+ C59E                                     
+ C59E            
+ C59E            t5state4:                       ; DISPLAY WAVE
+ C59E  F7082E            tst    RUN
+ C5A1  2749              beq    t5s4c            ; do not update function generator if RUN=0
+ C5A3  F7082D            tst    NEWBTI
+ C5A6  274C              beq    t5s4e            ; do not update function generator if NEWBTI=0
+ C5A8  730825            dec    LSEG             ; decrement segment length counter
+ C5AB  263A              bne    t5s4b            ; if not at end, simply update DAC output
+ C5AD  730824            dec    CSEG             ; if at end, decrement segment counter
+ C5B0  2622              bne    t5s4a            ; if not last segment, skip reinit of wave
+ C5B2  FE0822                    ldx    WAVEPTR          ; point to start of data for wave
+ C5B5  180D000824         movb   0,X, CSEG        ; get number of wave segments
+ C5BA  1805010829         movw   1,X, VALUE       ; get initial value for DAC
+ C5BF  180D030825         movb   3,X, LSEG        ; load segment length
+ C5C4  1805040826         movw   4,X, SEGINC      ; load segment increment
+ C5C9  08                inx                     ; inc SEGPTR to next segment
+ C5CA  08                inx
+ C5CB  08                inx
+ C5CC  08                inx
+ C5CD  08                inx
+ C5CE  08                inx
+ C5CF  7E082B            stx    SEGPTR           ; store incremented SEGPTR for next segment
+ C5D2  201D                      bra    t5s4d
+ C5D4  FE082B    t5s4a:  ldx    SEGPTR           ; point to start of new segment
+ C5D7  180D000825         movb   0,X, LSEG        ; initialize segment length counter
+ C5DC  1805010826         movw   1,X, SEGINC      ; load segment increment
+ C5E1  08                inx                     ; inc SEGPTR to next segment
+ C5E2  08                inx
+ C5E3  08                inx
+ C5E4  7E082B            stx    SEGPTR           ; store incremented SEGPTR
+ C5E7            t5s4b:             
+ C5E7  16C74A                    jsr    TESTSEGINC
+ C5EA  2005              bra    t5s4d
+ C5EC  180B010804 t5s4c:  movb   #$01, t5state    ; set next state
+ C5F1  79082D    t5s4d:  clr    NEWBTI
+ C5F4  3D        t5s4e:  rts
+ C5F5            
+ C5F5            
+ C5F5                                                    
+ C5F5                                            
+ C5F5            ;==============================================================================
+ C5F5  312D534157544F4F54482020322D53494E452020332D535155415245 PROMPT:                  .ascii   '1-SAWTOOTH  2-SINE  3-SQUARE'
+ C611  00                                        .byte    $00 
+ C612            
+ 05BD 534157544F4F544820204E494E543D202020202020202020202020202020205B31202D3235355D SAWPROMPT:         .ascii   'SAWTOOTH  NINT=                [1 -255]'
+ C639  00                                        .byte    $00
+ C63A            
+ 05E5 53494E4520204E494E543D20202020202020202020202020202020202020205B31202D3235355D SINEPROMPT:                .ascii   'SINE  NINT=                    [1 -255]'
+ C661  00                                        .byte    $00
+ C662            
+ 060D 53515541524520204E494E543D2020202020202020202020202020202020205B31202D3235355D SQUAREPROMPT:      .ascii   'SQUARE  NINT=                  [1 -255]'
+ C689  00                                        .byte    $00
+ C68A                                                                            
+ C68A  20202020204D41474E495455444520544F4F204C41524745202020202020202020202020202020 HIGH:                      .ascii   '     MAGNITUDE TOO LARGE               '
+ C6B1  00                                        .byte    $00
+ C6B2                                            
+ C6B2  2020205A45524F204D41474E495455444520494E415050524F5052494154452020202020202020 ZEROMAG:           .ascii   '   ZERO MAGNITUDE INAPPROPRIATE        '
+ C6D9  00                                        .byte    $00    
+ C6DA            
+ C6DA  2020204E4F20444947495453202020202020202020202020202020202020202020202020202020 NODIGIT:           .ascii   '   NO DIGITS                           '
+ C701  00                                        .byte    $00                            
+ C702            ;=============================================================================
+ C702            SAWTOOTH:
+ C702            
+ C702  02                         .byte 2                                        ;number of segments
+ C703  0400                       .word 1024                                     ;initial DAC input value 5 volts
+ C705  14                         .byte 20                                       ;length for segment 1
+ C706  0070                       .word 112                                      ;increment for segment 1
+ C708  01                         .byte 1                                        ;length for segment 2
+ C709  F740                       .word -2240                            ;increment for segment 2
+ C70B                             
+ C70B            SINE:
+ C70B  07                         .byte 7                                        ;number of segments
+ C70C  0800                       .word 2048                                     ;intial DAC value
+ C70E  19                         .byte 25                                       ;length
+ C70F  0021                       .word 33                                       ;increment
+ C711  32                         .byte 50
+ C712  0008                       .word 8
+ C714  32                         .byte 50
+ C715  FFF8                       .word -8
+ C717  32                         .byte 50
+ C718  FFDF                       .word -33
+ C71A  32                         .byte 50
+ C71B  FFF8                       .word -8
+ C71D  32                         .byte 50
+ C71E  0008                       .word 8
+ C720  19                         .byte 25
+ C721  0021                       .word 33
+ C723                             
+ C723            SQUARE:
+ C723  04                         .byte 4
+ C724  0400                       .word 1024
+ C726  01                         .byte 1
+ C727  08C0                       .word 2240
+ C729  0A                         .byte 10
+ C72A  0000                       .word 0
+ C72C  01                         .byte 1
+ C72D  F740                       .word -2240
+ C72F  0A                         .byte 10
+ C730  0000                       .word 0
+ C732                             
+ C732            
+ C732            ;====================================================================
+ C732            
+ C732            SETUP:
+ C732            
+ C732  1C002810                  bset PORTJ, PIN5                        ;closed latch
+ C736  1C002910                  bset DDRJ,  PIN5                        ; sets PORTJ to output from PIN5    
+ C73A  3D                    rts
+ C73B            
+ C73B            ;===============================================================================                
+ C73B                            
+ C73B            OUTDAC:
+ C73B  7A0301                staa        $0301                           ;stores the msb of A
+ C73E  7B0300                stab    $0300                               ;stores ot lsb of A
+ C741  1D002810              bclr        PORTJ, PIN5                     ;Opens latch to DAC
+ C745  1C002810              bset        PORTJ, PIN5                     ;closes latch to DAC
+ C749  3D                        rts     
+ C74A                            
+ C74A            TESTSEGINC:
+ C74A            
+ C74A  FC0826                    ldd             SEGINC                          ;load d with seg inc
+ C74D  8C0000                    cmpd    #$0000                          ;compare to 0
+ C750  2B0A                      BMI     comp                            ;branch if negative
+ C752  FC0826                    ldd             SEGINC                          ;load increment to d
+ C755  F30829                    addd    VALUE                           ;add value and d, result in d
+ C758  7C0829                    std     VALUE                           ;store d in value
+ C75B  3D                        rts
+ C75C                            
+ C75C               comp:
+ C75C  180408260832               movw SEGINC, TINC
+ C762  FC0832                     ldd  TINC                                      ;take 2scompliment of seginc
+ C765  50                         NEGB
+ C766  41                         coma 
+ C767  7C0832                     std  TINC
+ C76A  FC0829                     ldd  VALUE                                     ;load value into d
+ C76D  B30832                     SUBD TINC                                  ;subtract inc from value, result in d
+ C770  7C0829                     STD  VALUE                             ;store d in value
+ C773  3D                         rts
+ C774                             
+ C774            ;======================================================================
+ C774            
+                .area interrupt_vectors (abs)
+                          .org          $FFEE
+ FFEE  C50E                .word         TC0_ISR
+                          .org          $FFFE                           ;at reset vector location
+ FFFE  C000                .word         __start                         ;load starting address
+ 10000                      
+ 10000                      
+ 10000            ;===============================================================================

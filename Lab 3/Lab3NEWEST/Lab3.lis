@@ -1,0 +1,916 @@
+ 0000           ;Lab 3 code
+ 0000           ;L. Carter Price
+ 0000           ;Sara V. 
+ 0000           
+ 0000           
+ 0000           ;Assembler Equates
+ 0000           
+ 00D6           PORTS        = $00D6              ; output port for LEDs
+ 00D7           DDRS         = $00D7
+ 0003           LED_MSK_1    = 0b00000011         ; LED_1 output pins
+ 0001           R_LED_1      = 0b00000001         ; red LED_1 output pin
+ 0002           G_LED_1      = 0b00000010		  ; green LED_1 output pin
+ 000C           LED_MSK_2	 = 0b00001100        
+ 0004           R_LED_2		 = 0b00000100
+ 0008           G_LED_2		 = 0b00001000
+ 0000           
+ 0000           ;RAM
+                .area bss
+                
+                
+ 0000           BACKflag::          .blkb 1                     ;backspace flag  NOT USED YET                                            *
+ 0001           DPTR::                  .blkb 2                 ;address of next character to be read and displayed
+ 0003           FIRSTCH::               .blkb 1         ;first character flag                                                            *                            
+ 0004           DLINE1::                .blkb 1                 ;display line 1 flag                                                             *                                                         
+ 0005           DLINE2::                .blkb 1                 ;display line 2 flag                                                             *
+ 0006           L1::                    .blkb 1                 ;initalizes original prompt
+ 0007           L2::                    .blkb 1                 ;initalizes original prompt
+ 0008           F1flag::                .blkb 1                 ;indicates the line 1 being written to                           *
+ 0009           F2flag::                .blkb 1                 ;indicates line 2 being written to                                       *      
+ 000A           DIGITflag::             .blkb 1                 ;indicates that a digit is to be displayed                       *
+ 000B           BUFFER::                .blkb 6                 ;stores the entered digit
+ 0011           POINTER::               .blkb 2                 ;points to address of the next digit in buffer
+ 0013           COUNT::                 .blkb 1                 ;number of digits enterd                                                         *
+ 0014           FIRSTdig::              .blkb 1                 ;indicates the first digit on the line                           *
+ 0015           TEMP::                  .blkb 1                 ;the ascii of whatever was entered in Keypad             *
+ 0016           COUNT2::                .blkb 1                 ;
+ 0017           RESULT::                .blkb 2                 ;the BCD of the entered value
+ 0019           TICKS_1::       .blkb 2                 ;the amount fo time for blink pair 1          
+ 001B           COUNT_1::       .blkb 2                 ;decrements each time through, controls blink time LED1
+ 001D           DONE_1::        .blkb 1                 ;communicates when to switch to next step in task LED1 *
+ 001E           TICKS_2::       .blkb 2                 ;the amount fo time for blink pair 1                             
+ 0020           COUNT_2::       .blkb 2                 ;decrements each time through, controls blink time LED2
+ 0022           DONE_2::        .blkb 1                 ;communicates when to switch to next step in task LED2 *
+ 0023           t1state::       .blkb 1                 ;the state of task 4
+ 0024           t2state::       .blkb 1                 ;the state of task 5
+ 0025           t3state::       .blkb 1                 ;the state of task 8
+ 0026           t4state::       .blkb 1                 ;the state of task 6
+ 0027           t5state::       .blkb 1                 ;the state fo task 7
+ 0028           ON_1::                  .blkb 1                 ;indicates if LED pair 1 should be on                              *
+ 0029           ON_2::                  .blkb 1                 ;indicates if LED pair 2 should be on                              *
+ 002A           TOOHIGHflag::   .blkb 1                 ;indicates if enter value is too high
+ 002B           SHOWflag::              .blkb 1                 ;indicates if screen should pause on an error              *
+ 002C           SHOWCOUNT::             .blkb 2                 ;counts the time to show error
+ 002E           NODIGflag::             .blkb 1                 ;indicates no digits entered                                               *
+ 002F           ZEROflag::              .blkb 1                 ;indicates a zero was entered                                              *
+ 0030           CLINE1flag::    .blkb 1                 ;flags to clear line 1                                                             *
+ 0031           CLINE2flag::    .blkb 1                 ;flags to clear line 2                                                             *
+ 0032           COUNTBUFF::             .blkb 1                 ;counter in clear buffer routine                                           
+ 0033           FIRSTRUN1::     .blkb 1                 ;flag to initialize the keypad                                             
+ 0034           FIRSTRUN2::             .blkb 1                 ;flag to initialize the display 
+ 0035           
+                .area text
+                
+                
+ 0000 180B010006 _main::                        movb   #$01, L1
+ 0005 180B010007                                movb   #$01, L2
+ 000A 180B010003                                movb   #$01, FIRSTCH
+ 000F 1803000B0011                              movw   #BUFFER,POINTER          ;moves the contents of BUFFER into POINTER
+ 0015                                           
+ 0015 180303E8002C                              movw   #$03E8,SHOWCOUNT
+ 001B 180B060032                                movb   #$06, COUNTBUFF
+ 0020                                           
+ 0020 180B010033                                movb   #$01, FIRSTRUN1
+ 0025 180B010034                                movb   #$01, FIRSTRUN2
+ 002A                                           
+ 002A 790023                                    clr    t1state              ; initialize all tasks to state0
+ 002D 790024                            clr    t2state
+ 0030 790025                            clr    t3state
+ 0033 790026                                    clr    t4state
+ 0036 790027                                    clr    t5state
+ 0039                                           
+ 0039 790028                                    clr    ON_1
+ 003C 790029                                    clr    ON_2
+ 003F                                           
+ 003F                                           
+ 003F                                           
+ 003F                                           
+ 003F                           
+ 003F           		TOP:  
+ 003F           			 
+ 003F 160059                              jsr TASK_1                    ;mastermind
+ 0042 160254                              jsr TASK_2                    ;Keypad Driver
+ 0045 160273                              jsr TASK_3                    ;Display Driver
+ 0048 160492                              jsr TASK_4                    ;pattern_1
+ 004B 16051B                              jsr TASK_5                    ;count LED pair 1
+ 004E 160562                              jsr TASK_6                    ;pattern_2
+ 0051 1605EB                              jsr TASK_7                    ;count LED pair 2
+ 0054 160632                              jsr TASK_8                    ;delay
+ 0057 20E6                                 bra TOP
+ 0059           
+ 0059           ;===============================================================================
+ 0059           
+ 0059           ;MASTERMIND
+ 0059           
+ 0059 F70006    TASK_1:          tst    L1                              ;test L1
+ 005C 2674                               bne    Prompt1 
+ 005E F70007                             tst    L2                              ;test L2 
+ 0061 2675                               bne    Prompt2
+ 0063 F7002B                             tst    SHOWflag
+ 0066 262C                               bne    SHOW
+ 0068                                    
+ 0068 F60015                             ldab   TEMP                    ;loads TEMP val from keypad             
+ 006B C1F1                               cmpb   #$F1                    ;compares accumulator B to see if F1 is pressed
+ 006D 276F                               beq    F1Press
+ 006F F60015                             ldab   TEMP
+ 0072 C1F2                               cmpb   #$F2                    ;compares acc b to see if F2 pressed
+ 0074 1827008F                           lbeq   F2Press 
+ 0078                                    
+ 0078 F60015                             ldab   TEMP
+ 007B C10A                               CMPB   #$0A                    ;compares acc b to ent ascii value
+ 007D 182700D9                           LBEQ   ENTERpress      
+ 0081 C108                               CMPB   #$08                    ;compare acc b to BACKSPACE ascii value
+ 0083 18270107                           LBEQ   BACKSPACE       
+ 0087                                           
+ 0087 C130                               CMPB   #$30                    ;compares acc b to 30
+ 0089 182D00FC                           LBLT   ERROR                   ;branch to Loop if less than 30
+ 008D C139                               CMPB   #$39                    ;compares acc b to 39
+ 008F 182F00DE                           LBLE   DIGITpress              ;branches to digit      
+ 0093 3D                                 rts
+ 0094                                    
+ 0094                                    
+ 0094           SHOW:		 
+ 0094 FC002C                             ldd    SHOWCOUNT
+ 0097 830001                             SUBD   #0001
+ 009A 7C002C                             std    SHOWCOUNT
+ 009D F7002C                             tst    SHOWCOUNT
+ 00A0 2701                               beq    RESETSHOW
+ 00A2 3D                                 rts
+ 00A3                                    
+ 00A3                                    
+ 00A3                                    
+ 00A3 790015    RESETSHOW:       clr TEMP
+ 00A6 79002B                             clr SHOWflag
+ 00A9 180305DC002C                       movw #1500, SHOWCOUNT
+ 00AF F70008                             tst F1flag
+ 00B2 2606                               bne RESETL1
+ 00B4 F70009                             tst F2flag
+ 00B7 260D                               bne RESETL2
+ 00B9 3D                                 rts
+ 00BA                                    
+ 00BA 180B010006 RESETL1:       movb #$01, L1
+ 00BF 790008                            clr F1flag
+ 00C2 790009                            clr F2flag
+ 00C5 3D                                rts
+ 00C6 180B010007 RESETL2:       movb #$01, L2
+ 00CB 790008                            clr F1flag
+ 00CE 790009                            clr F2flag
+ 00D1 3D                                rts
+ 00D2                                    
+ 00D2           Prompt1:
+ 00D2 180B010004                         movb #$01, DLINE1      ;set the Display Line 1 flag
+ 00D7 3D                                 rts
+ 00D8           Prompt2:
+ 00D8 180B010005                         movb #$01, DLINE2              ;set the Display Line 2 flag
+ 00DD 3D                                 rts
+ 00DE                                    
+ 00DE           F1Press:
+ 00DE           			 
+ 00DE 1D00D603                           bclr PORTS, LED_MSK_1  ;turns off LED pair 1
+ 00E2 180B010030                         movb #$01, CLINE1flag
+ 00E7 180B010008                         movb #$01, F1flag              ;set the f1 flag
+ 00EC 180B010014                         movb #$01, FIRSTdig    ;sets the first digit flag
+ 00F1 790009                             clr F2flag                             ;clears the f2 flag
+ 00F4 790015                             clr TEMP
+ 00F7 790013                             clr COUNT
+ 00FA 790028                             clr ON_1
+ 00FD 160138                             jsr clrBUFF
+ 0100 1803000B0011                       movw #BUFFER, POINTER
+ 0106 3D                                 rts
+ 0107                                    
+ 0107           F2Press:	 
+ 0107 1D00D60C                           bclr PORTS, LED_MSK_2  ;turns off LED pair 2
+ 010B 180B010031                         movb #$01, CLINE2flag
+ 0110 180B010009                         movb #$01, F2flag              ;set the f2 flag
+ 0115 180B010014                         movb #$01, FIRSTdig    ;sets first digit flag
+ 011A 8648                               ldaa #$48
+ 011C 160000                             jsr SETADDR
+ 011F 160000                             jsr CURSOR
+ 0122 790008                             clr F1flag                             ;clears the f2 flag
+ 0125 790015                             clr TEMP
+ 0128 790013                             clr COUNT
+ 012B 790029                             clr ON_2
+ 012E 160138                             jsr clrBUFF
+ 0131 1803000B0011                       movw #BUFFER,POINTER
+ 0137 3D                                 rts
+ 0138                                    
+ 0138 1803000B0011 clrBUFF:      movw #BUFFER, POINTER
+ 013E           
+ 013E FE0011            BUFF:    ldx POINTER
+ 0141 E600                               ldab 0,x
+ 0143 C7                                 clrb
+ 0144 6B00                               stab 0,x
+ 0146 08                                 inx
+ 0147 7E0011                             stx POINTER
+ 014A 730032                             dec COUNTBUFF
+ 014D F70032                             tst COUNTBUFF
+ 0150 2702                               beq BUFFDONE
+ 0152 20EA                               bra BUFF
+ 0154                                    
+ 0154 180B060032        BUFFDONE:        movb #$06, COUNTBUFF
+ 0159 3D                                         rts
+ 015A           ENTERpress:	 
+ 015A F70014                             tst  FIRSTdig
+ 015D 260C                               bne  NODIG
+ 015F F70013                             tst  COUNT
+ 0162 2725                               beq ERROR
+ 0164 16019F                             jsr BCD
+ 0167 790015                             clr TEMP
+ 016A 3D                                 rts 
+ 016B                                    
+ 016B 180B01002E NODIG:          movb #$01, NODIGflag
+ 0170 3D                                 rts
+ 0171                                    
+ 0171 F70008    DIGITpress:      tst F1flag
+ 0174 2606                               bne PROCEED
+ 0176 F70009                             tst F2flag
+ 0179 2601                               bne PROCEED
+ 017B 3D                                 rts
+ 017C           
+ 017C 180B01000A PROCEED:        movb #$01, DIGITflag
+ 0181 F60013                             ldab   COUNT                   ;places current LCD address in accumulator A
+ 0184 C105                               cmpb   #$05
+ 0186 2702                               beq    MAXdig                  ;clears dig flag so typing stops
+ 0188 3D                                 rts
+ 0189                                    
+ 0189 3D        ERROR:           rts
+ 018A                                    
+ 018A 79000A    MAXdig:          clr DIGITflag
+ 018D 3D                                 rts 
+ 018E                                    
+ 018E 180B010000 BACKSPACE:      movb #$01, BACKflag
+ 0193 F60013                             ldab COUNT
+ 0196 C100                               cmpb #$00
+ 0198 2701                               beq  NOBS
+ 019A 3D                                 rts
+ 019B                                    
+ 019B 790000    NOBS:            clr BACKflag
+ 019E 3D                                 rts
+ 019F                                    
+ 019F           BCD:		;ASCII to BCD converter
+ 019F           				
+ 019F 1803000B0011                              movw  #BUFFER, POINTER
+ 01A5 180300000017                              movw #$0000, RESULT
+ 01AB CD0000                                    ldy      #$0000
+ 01AE 87                                        clra
+ 01AF C7                                        clrb
+ 01B0                                           
+ 01B0           		LOOP1:	
+ 01B0 CD000A                                    ldy       #$000A
+ 01B3 FC0017                                    ldd       RESULT
+ 01B6 13                                        emul
+ 01B7 8D0000                                    cpy       #$0000
+ 01BA 2621                                      bne  TOOBIG 
+ 01BC 7C0017                                    std RESULT
+ 01BF FE0011                                    ldx     POINTER
+ 01C2 E600                                      ldab 0,X
+ 01C4 C030                                      subb #$30
+ 01C6 87                                        clra
+ 01C7 F30017                                    addd RESULT                       ;add acc d and RESULT
+ 01CA 2511                                      BCS      TOOBIG
+ 01CC 7C0017                                    std RESULT
+ 01CF 730013                                    dec     COUNT
+ 01D2                                           
+ 01D2 F70013                                    tst COUNT
+ 01D5 2713                                      beq     DONE1
+ 01D7                                           
+ 01D7 08                                        inx
+ 01D8 7E0011                                    stx     POINTER
+ 01DB 20D3                                      bra LOOP1
+ 01DD                                           
+ 01DD 00        TOOBIG:                 BGND
+ 01DE 180B01002A                                movb #$01, TOOHIGHflag
+ 01E3 3D                                        rts
+ 01E4                                           
+ 01E4 180B01002F ZERO:                  movb #$01, ZEROflag
+ 01E9 3D                                        rts                     
+ 01EA                   
+ 01EA 00        DONE1:                  BGND
+ 01EB CC0000                                    ldd #$0000
+ 01EE BC0017                                    cpd     RESULT
+ 01F1 27F1                                      beq ZERO
+ 01F3 F70008                                    tst F1flag
+ 01F6 2606                                      bne     SET1
+ 01F8 F70009                                    tst F2flag
+ 01FB 262C                                      bne     SET2
+ 01FD 3D                                        rts
+ 01FE                                           
+ 01FE           SET1:			
+ 01FE 180300000019                              movw #$0000, TICKS_1
+ 0204 180400170019                              movw RESULT, TICKS_1
+ 020A 00                                        BGND
+ 020B 180B010028                                movb #$01, ON_1
+ 0210 180300000017                              movw #$0000, RESULT
+ 0216 790013                                    clr COUNT
+ 0219 18030000001B                              movw #$0000, COUNT_1
+ 021F 790023                                    clr t1state
+ 0222 790024                                    clr t2state
+ 0225 790025                                    clr t3state
+ 0228 3D                                        rts
+ 0229                                           
+ 0229           SET2:			
+ 0229 18030000001E                              movw #$0000, TICKS_2
+ 022F 18040017001E                              movw RESULT, TICKS_2
+ 0235 00                                        BGND
+ 0236 180B010029                                movb #$01, ON_2
+ 023B 180300000017                              movw #$0000, RESULT
+ 0241 790013                                    clr COUNT
+ 0244 180300000020                              movw #$0000, COUNT_2
+ 024A 790025                                    clr t3state
+ 024D 790026                                    clr t4state
+ 0250 790027                                    clr t5state
+ 0253 3D                                        rts
+ 0254           ;===============================================================================
+ 0254           
+ 0254           ;Keypad Driver
+ 0254           
+ 0254 F70033    TASK_2:           tst FIRSTRUN1
+ 0257 2602                                bne initKEY
+ 0259 200C                                bra startKEY
+ 025B                                    
+ 025B 160000            initKEY:  jsr KP_ACTIVE
+ 025E 160000                              jsr INITKEY
+ 0261 160000                              jsr FLUSH_BFR
+ 0264 790033                              clr FIRSTRUN1
+ 0267                                     
+ 0267                                     
+ 0267 F70000            startKEY: tst   L$KEY_FLG                               ;test key available flag
+ 026A 2606                                bne   SKIP    
+ 026C                                                                   
+ 026C 160000                              jsr   GETCHAR
+ 026F 7B0015                              stab  TEMP
+ 0272                                   
+ 0272                                   
+ 0272 3D                SKIP:     rts                                                   ;returns to subroutine
+ 0273           
+ 0273           ;==============================================================================
+ 0273           
+ 0273           ;DISPLAY Task
+ 0273           
+ 0273 F70034    TASK_3:          tst FIRSTRUN2
+ 0276 2602                               bne initDIS
+ 0278 2009                               bra startDIS
+ 027A                                    
+ 027A 160000            initDIS: jsr INITLCD
+ 027D 160000                             jsr CLRSCREEN
+ 0280 790034                             clr FIRSTRUN2
+ 0283                                    
+ 0283 F70004            startDIS:tst    DLINE1
+ 0286 182600B0                           lbne   initDisplay1      
+ 028A F70005                             tst    DLINE2
+ 028D 182600BC                           lbne   initDisplay2
+ 0291 F7002A                             tst    TOOHIGHflag
+ 0294 182600C8                           Lbne   HIGHdis
+ 0298 F7002E                             tst    NODIGflag
+ 029B 182600F2                           lbne   NODIGdis
+ 029F F7002F                             tst    ZEROflag
+ 02A2 1826011C                           lbne   ZEROdis
+ 02A6 F70008                             tst    F1flag
+ 02A9 2606                               bne    TOPtime
+ 02AB F70009                             tst    F2flag
+ 02AE 261D                               bne    BOTTOMtime
+ 02B0                                    
+ 02B0 3D                                 rts
+ 02B1                                    
+ 02B1           
+ 02B1 F70030    TOPtime:         tst    CLINE1flag
+ 02B4 18260133                           lbne   CLINE1dis
+ 02B8 F70000                             tst    BACKflag
+ 02BB 264F                               bne    BS
+ 02BD F7000A                             tst    DIGITflag         ;test Digitflag
+ 02C0 2749                               beq    RETURN
+ 02C2 F70014                             tst    FIRSTdig
+ 02C5 272B                               beq    Ddigit
+ 02C7 8608                               ldaa   #$08               ;loads the LCD address for top line number
+ 02C9 1602E9                             jsr    Ddigit_1st
+ 02CC 3D                                 rts
+ 02CD                                    
+ 02CD F70031    BOTTOMtime:      tst CLINE2flag
+ 02D0 18260126                           lbne CLINE2dis
+ 02D4 F70000                             tst BACKflag
+ 02D7 2633                               bne BS
+ 02D9 F7000A                             tst    DIGITflag         ;test Digitflag
+ 02DC 272D                               beq    RETURN
+ 02DE F70014                             tst    FIRSTdig
+ 02E1 270F                               beq    Ddigit
+ 02E3 8648                               ldaa   #$48               ;loads the LCD address for top line number
+ 02E5 1602E9                             jsr    Ddigit_1st
+ 02E8 3D                                 rts
+ 02E9           
+ 02E9           Ddigit_1st:	 
+ 02E9 160000                             jsr SETADDR
+ 02EC 160000                             jsr CURSOR
+ 02EF 790014                             clr FIRSTdig
+ 02F2                                   
+ 02F2 F60015    Ddigit:          ldab TEMP
+ 02F5 160000                             jsr OUTCHAR
+ 02F8 790015                             clr TEMP
+ 02FB FE0011                             ldx POINTER                                    ;loads acc X with pointer
+ 02FE 6B00                               stab 0,X                                               ;Stores contents of acc B into the location of the address found in acc X which is POINTER
+ 0300 720013                             inc COUNT
+ 0303 08                                 INX
+ 0304 7E0011                             stx POINTER
+ 0307 79000A                             clr DIGITflag                                  ;clears the DIGITflag so the program cycles until another digit pressed
+ 030A 3D                                 rts
+ 030B 3D        RETURN:          rts              
+ 030C                                   
+ 030C           BS:			 
+ 030C 160000                             jsr LOAD_ADDR                                  ;load current address in acc A
+ 030F 8001                               SUBA #$01                                              ;subtract 1 from address
+ 0311 160000                             jsr SETADDR
+ 0314 160000                             jsr CURSOR                                     
+ 0317 C620                               ldab #$20                                              ;load space into B
+ 0319 160000                             jsr  OUTCHAR                           ;prints character in B
+ 031C 160000                             jsr LOAD_ADDR                                  ;load current address in acc A
+ 031F 8001                               SUBA #$01      
+ 0321 160000                             jsr SETADDR
+ 0324 160000                             jsr CURSOR     
+ 0327 790000                             clr BACKflag                                   ;clear the Backspace flag
+ 032A 790015                             clr TEMP
+ 032D FE0011                             ldx POINTER                                    ;load POINTER into X
+ 0330 09                                 dex                                                                            
+ 0331 6900                               clr 0,X                                                ;clears the value stored at the address in X
+ 0333 730013                             dec COUNT
+ 0336                                    
+ 0336 7E0011                             stx POINTER
+ 0339 3D                                 rts
+ 033A                                     
+ 033A           initDisplay1:
+ 033A           
+ 033A F70003                             tst    FIRSTCH                 ;test if the first character is true
+ 033D 182700D1                           lbeq   DCHAR
+ 0341 8600                               ldaa   #$00               ;loads the LCD address 
+ 0343 CE0645                             ldx    #LINE1             ;starting address of string to be displayed
+ 0346 160409                             jsr    DCHAR_1st
+ 0349 182000D3                           lbra   BOTTOM
+ 034D                    
+ 034D           initDisplay2:
+ 034D F70003                             tst    FIRSTCH                 ;test if the first character is true
+ 0350 182700BE                           lbeq   DCHAR
+ 0354 8640                               ldaa   #$40               ;loads the LCD address 
+ 0356 CE066A                             ldx    #LINE2             ;starting address of string to be displayed
+ 0359 160409                             jsr    DCHAR_1st
+ 035C 182000C0                           lbra   BOTTOM
+ 0360                                            
+ 0360 F70008    HIGHdis:         tst    F1flag
+ 0363 2606                               bne    HIGH1
+ 0365 F70009                             tst    F2flag
+ 0368 2614                               bne    HIGH2
+ 036A 3D                                 rts
+ 036B                                    
+ 036B F70003            HIGH1:   tst    FIRSTCH                 ;test if the first character is true
+ 036E 182700A0                           lbeq   DCHAR
+ 0372 8608                               ldaa   #$08               ;loads the LCD address 
+ 0374 CE068F                             ldx    #HIGH              ;starting address of string to be displayed
+ 0377 160409                             jsr    DCHAR_1st
+ 037A 182000A2                           lbra   BOTTOM
+ 037E                                    
+ 037E F70003            HIGH2:   tst    FIRSTCH                 ;test if the first character is true
+ 0381 1827008D                           lbeq   DCHAR
+ 0385 8648                               ldaa   #$48               ;loads the LCD address 
+ 0387 CE068F                             ldx    #HIGH              ;starting address of string to be displayed
+ 038A 160409                             jsr    DCHAR_1st
+ 038D 1820008F                           lbra   BOTTOM
+ 0391                                    
+ 0391                                    
+ 0391 F70008    NODIGdis:        tst    F1flag
+ 0394 18260008                           lbne   NODIG1
+ 0398 F70009                             tst    F2flag
+ 039B 18260014                           lbne   NODIG2
+ 039F 3D                                 rts
+ 03A0                                    
+ 03A0 F70003            NODIG1:  tst    FIRSTCH                 ;test if the first character is true
+ 03A3 1827006B                           lbeq   DCHAR
+ 03A7 8608                               ldaa   #$08               ;loads the LCD address 
+ 03A9 CE06AD                             ldx    #NODIGIT                   ;starting address of string to be displayed
+ 03AC 160409                             jsr    DCHAR_1st
+ 03AF 1820006D                           lbra   BOTTOM
+ 03B3                                    
+ 03B3 F70003            NODIG2:  tst    FIRSTCH                 ;test if the first character is true
+ 03B6 275A                               beq    DCHAR
+ 03B8 8648                               ldaa   #$48               ;loads the LCD address 
+ 03BA CE06AD                             ldx    #NODIGIT                   ;starting address of string to be displayed
+ 03BD 160409                             jsr    DCHAR_1st
+ 03C0 205E                               bra    BOTTOM
+ 03C2                                    
+ 03C2 F70008    ZEROdis:         tst    F1flag
+ 03C5 2606                               bne    ZERO1
+ 03C7 F70009                             tst    F2flag
+ 03CA 2610                               bne    ZERO2
+ 03CC 3D                                 rts
+ 03CD                                    
+ 03CD F70003            ZERO1:   tst    FIRSTCH                 ;test if the first character is true
+ 03D0 2740                               beq    DCHAR
+ 03D2 8608                               ldaa   #$08               ;loads the LCD address 
+ 03D4 CE06CB                             ldx    #ZEROMAG                ;starting address of string to be displayed
+ 03D7 160409                             jsr    DCHAR_1st
+ 03DA 2044                               bra    BOTTOM
+ 03DC                                    
+ 03DC F70003            ZERO2:   tst    FIRSTCH                 ;test if the first character is true
+ 03DF 2731                               beq    DCHAR
+ 03E1 8648                               ldaa   #$48               ;loads the LCD address 
+ 03E3 CE06CB                             ldx    #ZEROMAG                ;starting address of string to be displayed
+ 03E6 160409                             jsr    DCHAR_1st
+ 03E9 2035                               bra    BOTTOM
+ 03EB                                    
+ 03EB F70003    CLINE1dis:       tst    FIRSTCH                 ;test if the first character is true
+ 03EE 2722                               beq    DCHAR
+ 03F0 8608                               ldaa   #$08               ;loads the LCD address 
+ 03F2 CE06E9                             ldx    #CLINE          ;starting address of string to be displayed
+ 03F5 160409                             jsr    DCHAR_1st
+ 03F8 2026                               bra    BOTTOM
+ 03FA                                    
+ 03FA F70003    CLINE2dis:   tst        FIRSTCH                 ;test if the first character is true
+ 03FD 2713                               beq    DCHAR
+ 03FF 8648                               ldaa   #$48               ;loads the LCD address 
+ 0401 CE06E9                             ldx    #CLINE          ;starting address of string to be displayed
+ 0404 160409                             jsr    DCHAR_1st
+ 0407 2017                               bra    BOTTOM
+ 0409             
+ 0409 7E0001    DCHAR_1st:      STX DPTR                   ;store contents of X in DPTR
+ 040C 160000                            jsr SETADDR                ;set the address of of cursor to current location
+ 040F 790003                            clr FIRSTCH                ;clear variable FIRSTCH
+ 0412           
+ 0412                     
+ 0412           DCHAR:
+ 0412 FE0001                            ldx DPTR                   ;load x with DPTR
+ 0415 E600                              ldab 0,x                   ;load acc b with contents of the address located in X
+ 0417 270D                              beq DONE                   
+ 0419 160000                            jsr OUTCHAR
+ 041C 08                                inx
+ 041D 7E0001                            stx DPTR
+ 0420                                                   
+ 0420           BOTTOM:		
+ 0420           			
+ 0420 F70003                            tst FIRSTCH                ;test if firstchar entered for another string
+ 0423 2608                              bne DONELINE       ;branch to done 
+ 0425 3D                                rts
+ 0426                                   
+ 0426           DONE:		
+ 0426           			
+ 0426 180B010003                        movb #$01, FIRSTCH
+ 042B                                   
+ 042B 20F3                              bra BOTTOM
+ 042D                                   
+ 042D           DONELINE:	
+ 042D           		
+ 042D F70006                            tst L1                    ;test L1 
+ 0430 261F                              bne CL1                   ;branch to CL1 if not 0
+ 0432 F70007                            tst L2                    
+ 0435 2621                              bne CL2
+ 0437 F7002A                            tst TOOHIGHflag
+ 043A 2623                              bne CHIGH
+ 043C F7002E                            tst NODIGflag
+ 043F 2627                              bne CNODIG
+ 0441 F7002F                            tst ZEROflag
+ 0444 262B                              bne CZERO
+ 0446 F70030                            tst CLINE1flag
+ 0449 262F                              bne CLRCLINE1
+ 044B F70031                            tst CLINE2flag
+ 044E 2636                              bne     CLRCLINE2
+ 0450 3D                                rts
+ 0451                                   
+ 0451 790006    CL1:            clr L1
+ 0454 790004                            clr DLINE1
+ 0457 3D                                rts
+ 0458                                   
+ 0458 790007    CL2:            clr L2
+ 045B 790005                            clr DLINE2
+ 045E 3D                                rts
+ 045F                                   
+ 045F 79002A    CHIGH:          clr TOOHIGHflag
+ 0462 180B01002B                        movb #$01, SHOWflag
+ 0467 3D                                rts
+ 0468                                   
+ 0468 79002E    CNODIG:         clr NODIGflag
+ 046B 180B01002B                        movb #$01, SHOWflag
+ 0470 3D                                rts     
+ 0471                                   
+ 0471 79002F    CZERO:          clr ZEROflag
+ 0474 180B01002B                        movb #$01, SHOWflag
+ 0479 3D                                rts     
+ 047A                                                   
+ 047A 790030    CLRCLINE1:      clr CLINE1flag
+ 047D 8608                              ldaa #$08
+ 047F 160000                            jsr SETADDR
+ 0482 160000                            jsr CURSOR
+ 0485 3D                                rts     
+ 0486                                   
+ 0486 790031    CLRCLINE2:      clr CLINE2flag
+ 0489 8648                              ldaa #$48
+ 048B 160000                            jsr SETADDR
+ 048E 160000                            jsr CURSOR
+ 0491 3D                                rts                                                     
+ 0492           ;=========================================================================
+ 0492           ;=============================================================================
+ 0492           ;
+ 0492           ;    Subroutine TASK_4            ; pattern_1 for LED pair 1
+ 0492           
+ 0492           TASK_4: 
+ 0492 F70028                    tst ON_1
+ 0495 2601                      bne START1
+ 0497 3D                        rts 
+ 0498           
+ 0498 790008    START1: clr    F1flag
+ 049B B60023                    ldaa   t1state            ; get current t1state and branch accordingly
+ 049E 2713              beq    t1state0
+ 04A0 43                deca
+ 04A1 271E              beq    t1state1
+ 04A3 43                deca
+ 04A4 272A              beq    t1state2
+ 04A6 43                deca
+ 04A7 2736              beq    t1state3
+ 04A9 43                deca
+ 04AA 2742              beq    t1state4
+ 04AC 43                deca
+ 04AD 274E              beq    t1state5
+ 04AF 43                deca
+ 04B0 275A              beq    t1state6
+ 04B2 3D                rts                       ; undefined state - do nothing but return
+ 04B3           
+ 04B3           t1state0:                         ; init TASK_1
+ 04B3 1D00D603          bclr   PORTS, LED_MSK_1   ; ensure that LEDs are off when initialized
+ 04B7 1C00D703          bset   DDRS, LED_MSK_1    ; set LED_MSK_1 pins as PORTS outputs
+ 04BB 180B010023         movb   #$01, t1state      ; set next state
+ 04C0 3D                rts
+ 04C1           
+ 04C1           t1state1:                         ; G, not R
+ 04C1 1C00D602          bset   PORTS, G_LED_1     ; set state1 pattern on LEDs
+ 04C5 F7001D            tst    DONE_1             ; check TASK_1 done flag
+ 04C8 2705              beq    exit_t1s1          ; if not done, return
+ 04CA 180B020023         movb   #$02, t1state      ; if done, set next state
+ 04CF           exit_t1s1:
+ 04CF 3D                rts
+ 04D0           t1state2:                         ; not G, not R
+ 04D0 1D00D602          bclr   PORTS, G_LED_1     ; set state2 pattern on LEDs
+ 04D4 F7001D            tst    DONE_1             ; check TASK_1 done flag
+ 04D7 2705              beq    exit_t1s2          ; if not done, return
+ 04D9 180B030023         movb   #$03, t1state      ; if done, set next state
+ 04DE           exit_t1s2:
+ 04DE 3D                rts
+ 04DF           t1state3:                         ; not G, R
+ 04DF 1C00D601          bset   PORTS, R_LED_1     ; set state3 pattern on LEDs
+ 04E3 F7001D            tst    DONE_1             ; check TASK_1 done flag
+ 04E6                           ;bgnd
+ 04E6 2705              beq    exit_t1s3          ; if not done, return
+ 04E8 180B040023         movb   #$04, t1state      ; if done, set next state
+ 04ED           exit_t1s3:
+ 04ED 3D                rts
+ 04EE           t1state4:                         ; not G, not R
+ 04EE 1D00D603          bclr   PORTS, LED_MSK_1   ; set state4 pattern on LEDs
+ 04F2 F7001D            tst    DONE_1             ; check TASK_1 done flag
+ 04F5 2705              beq    exit_t1s4          ; if not done, return
+ 04F7 180B050023         movb   #$05, t1state      ; if done, set next state
+ 04FC           exit_t1s4:
+ 04FC 3D                     rts
+ 04FD           t1state5:                         ; G, R
+ 04FD 1C00D603          bset   PORTS, LED_MSK_1   ; set state5 pattern on LEDs
+ 0501 F7001D            tst    DONE_1             ; check TASK_1 done flag
+ 0504                           ;bgnd
+ 0504 2705              beq    exit_t1s5          ; if not done, return
+ 0506 180B060023         movb   #$06, t1state      ; if done, set next state
+ 050B           exit_t1s5:
+ 050B 3D                rts
+ 050C           
+ 050C           t1state6:                         ; not G, not R
+ 050C 1D00D603          bclr   PORTS, LED_MSK_1   ; set state6 pattern on LEDs
+ 0510 F7001D            tst    DONE_1             ; check TASK_1 done flag
+ 0513 2705              beq    exit_t1s6          ; if not done, return
+ 0515 180B010023         movb   #$01, t1state      ; if done, set next state
+ 051A           exit_t1s6:
+ 051A 3D                rts
+ 051B           
+ 051B           ; end TASK_4
+ 051B           ;
+ 051B           ;=============================================================================
+ 051B           ;
+ 051B           ;    Subroutine TASK_5            ; count down LED_1 pair
+ 051B           
+ 051B F70028    TASK_5: tst    ON_1
+ 051E 2601                      bne        STARTt5
+ 0520 3D                        rts
+ 0521                           
+ 0521 B60024    STARTt5:ldaa   t2state            ; get current t2state and branch accordingly
+ 0524 2707              beq    t2state0
+ 0526 43                deca
+ 0527 270D              beq    t2state1
+ 0529 43                        deca
+ 052A 2720                      beq        t2state2
+ 052C 3D                rts                       ; undefined state - do nothing but return
+ 052D           
+ 052D           t2state0:                         ; initialization for TASK_2
+ 052D 79001D            clr    DONE_1
+ 0530 180B010024         movb   #$01, t2state      ; set next state
+ 0535 3D                        rts
+ 0536           t2state1:                         ; (re)initialize COUNT_1
+ 0536 18040019001B         movw   TICKS_1, COUNT_1
+ 053C FE001B            ldx    COUNT_1
+ 053F 09                dex                       ; decrement COUNT_1
+ 0540 7E001B            stx    COUNT_1            ; store decremented COUNT_1
+ 0543 79001D            clr    DONE_1
+ 0546 180B020024         movb   #$02, t2state      ; set next state
+ 054B 3D                rts
+ 054C           
+ 054C           t2state2:                         ; count down COUNT_1
+ 054C FE001B            ldx    COUNT_1
+ 054F 2706              beq    setdone_1          ; test to see if COUNT_1 is already zero
+ 0551 09                dex                       ; decrement COUNT_1
+ 0552 7E001B            stx    COUNT_1            ; store decremented COUNT_1
+ 0555 260A              bne    exit_t2s2          ; if not done, return
+ 0557           setdone_1:
+ 0557 180B01001D         movb   #$01, DONE_1       ; if done, set DONE_1 flag
+ 055C 180B010024         movb   #$01, t2state      ; set next state
+ 0561           exit_t2s2:
+ 0561 3D                rts
+ 0562           
+ 0562           ; end TASK_5
+ 0562           ; 
+ 0562           ;=============================================================================
+ 0562           ;    Subroutine TASK_6            ; pattern_2
+ 0562           
+ 0562           TASK_6: 
+ 0562 F70029                    tst ON_2
+ 0565 2601                      bne START2
+ 0567 3D                        rts
+ 0568           
+ 0568 790009    START2: clr    F2flag   
+ 056B B60026                    ldaa   t4state            ; get current t4state and branch accordingly
+ 056E 2713              beq    t4state0
+ 0570 43                deca
+ 0571 271E              beq    t4state1
+ 0573 43                deca
+ 0574 272A              beq    t4state2
+ 0576 43                deca
+ 0577 2736              beq    t4state3
+ 0579 43                deca
+ 057A 2742              beq    t4state4
+ 057C 43                deca
+ 057D 274E              beq    t4state5
+ 057F 43                deca
+ 0580 275A              beq    t4state6
+ 0582 3D                rts                       ; undefined state - do nothing but return
+ 0583           
+ 0583           t4state0:                         ; init TASK_1
+ 0583 1D00D60C          bclr   PORTS, LED_MSK_2   ; ensure that LEDs are off when initialized
+ 0587 1C00D70C          bset   DDRS, LED_MSK_2    ; set LED_MSK_1 pins as PORTS outputs
+ 058B 180B010026         movb   #$01, t4state      ; set next state
+ 0590 3D                rts
+ 0591           
+ 0591           t4state1:                         ; G, not R
+ 0591 1C00D608          bset   PORTS, G_LED_2     ; set state1 pattern on LEDs
+ 0595 F70022            tst    DONE_2             ; check TASK_1 done flag
+ 0598 2705              beq    exit_t4s1          ; if not done, return
+ 059A 180B020026         movb   #$02, t4state      ; if done, set next state
+ 059F           exit_t4s1:
+ 059F 3D                rts
+ 05A0           t4state2:                         ; not G, not R
+ 05A0 1D00D608          bclr   PORTS, G_LED_2     ; set state2 pattern on LEDs
+ 05A4 F70022            tst    DONE_2             ; check TASK_1 done flag
+ 05A7 2705              beq    exit_t4s2          ; if not done, return
+ 05A9 180B030026         movb   #$03, t4state      ; if done, set next state
+ 05AE           exit_t4s2:
+ 05AE 3D                rts
+ 05AF           t4state3:                         ; not G, R
+ 05AF 1C00D604          bset   PORTS, R_LED_2     ; set state3 pattern on LEDs
+ 05B3 F70022            tst    DONE_2             ; check TASK_1 done flag
+ 05B6                           ;bgnd
+ 05B6 2705              beq    exit_t4s3          ; if not done, return
+ 05B8 180B040026         movb   #$04, t4state      ; if done, set next state
+ 05BD           exit_t4s3:
+ 05BD 3D                rts
+ 05BE           t4state4:                         ; not G, not R
+ 05BE 1D00D60C          bclr   PORTS, LED_MSK_2   ; set state4 pattern on LEDs
+ 05C2 F70022            tst    DONE_2             ; check TASK_1 done flag
+ 05C5 2705              beq    exit_t4s4          ; if not done, return
+ 05C7 180B050026         movb   #$05, t4state      ; if done, set next state
+ 05CC           exit_t4s4:
+ 05CC 3D                     rts
+ 05CD           t4state5:                         ; G, R
+ 05CD 1C00D60C          bset   PORTS, LED_MSK_2   ; set state5 pattern on LEDs
+ 05D1 F70022            tst    DONE_2             ; check TASK_1 done flag
+ 05D4                           ;bgnd
+ 05D4 2705              beq    exit_t4s5          ; if not done, return
+ 05D6 180B060026         movb   #$06, t4state      ; if done, set next state
+ 05DB           exit_t4s5:
+ 05DB 3D                rts
+ 05DC           
+ 05DC           t4state6:                         ; not G, not R
+ 05DC 1D00D60C          bclr   PORTS, LED_MSK_2   ; set state6 pattern on LEDs
+ 05E0 F70022            tst    DONE_2             ; check TASK_1 done flag
+ 05E3 2705              beq    exit_t4s6          ; if not done, return
+ 05E5 180B010026         movb   #$01, t4state      ; if done, set next state
+ 05EA           exit_t4s6:
+ 05EA 3D                rts
+ 05EB           
+ 05EB           ; end TASK_6
+ 05EB           ;
+ 05EB           ;=============================================================================
+ 05EB           ;
+ 05EB           ;    Subroutine TASK_7            ; count down LED_2 pair
+ 05EB           
+ 05EB F70029    TASK_7: tst     ON_2
+ 05EE 2601                      bne             STARTt7
+ 05F0 3D                        rts
+ 05F1                           
+ 05F1 B60027    STARTt7:ldaa   t5state            ; get current t5state and branch accordingly
+ 05F4 2707              beq    t5state0
+ 05F6 43                deca
+ 05F7 270D              beq    t5state1
+ 05F9 43                        deca
+ 05FA 2720                      beq        t5state2
+ 05FC 3D                rts                       ; undefined state - do nothing but return
+ 05FD           
+ 05FD           t5state0:                         ; initialization for TASK_2
+ 05FD 790022            clr    DONE_2
+ 0600 180B010027         movb   #$01, t5state      ; set next state
+ 0605 3D                        rts
+ 0606           t5state1:                         ; (re)initialize COUNT_2
+ 0606 1804001E0020         movw   TICKS_2, COUNT_2
+ 060C FE0020            ldx    COUNT_2
+ 060F 09                dex                       ; decrement COUNT_2
+ 0610 7E0020            stx    COUNT_2            ; store decremented COUNT_2
+ 0613 790022            clr    DONE_2
+ 0616 180B020027         movb   #$02, t5state      ; set next state
+ 061B 3D                rts
+ 061C           
+ 061C           t5state2:                         ; count down COUNT_2
+ 061C FE0020            ldx    COUNT_2
+ 061F 2706              beq    setdone_2          ; test to see if COUNT_2 is already zero
+ 0621 09                dex                       ; decrement COUNT_2
+ 0622 7E0020            stx    COUNT_2            ; store decremented COUNT_2
+ 0625 260A              bne    exit_t5s2          ; if not done, return
+ 0627           setdone_2:
+ 0627 180B010022         movb   #$01, DONE_2       ; if done, set DONE_2 flag
+ 062C 180B010027         movb   #$01, t5state      ; set next state
+ 0631           exit_t5s2:
+ 0631 3D                rts
+ 0632           
+ 0632           ; end TASK_7
+ 0632           ; 
+ 0632           
+ 0632           
+ 0632           ;=============================================================================
+ 0632           ;
+ 0632           ;    Subroutine TASK_8            ; delay 1.00ms
+ 0632           
+ 0632 B60025    TASK_8: ldaa   t3state            ; get current t3state and branch accordingly
+ 0635 2704              beq    t3state0
+ 0637 43                deca
+ 0638 2707              beq    t3state1
+ 063A 3D                rts                       ; undefined state - do nothing but return
+ 063B           
+ 063B           t3state0:                         ; initialization for TASK_3
+ 063B                                             ; no initialization required
+ 063B 180B010025         movb   #$01, t3state      ; set next state
+ 0640 3D                rts
+ 0641           
+ 0641           t3state1:
+ 0641 1606EF            jsr    DELAY_1ms
+ 0644 3D                rts
+ 0645           
+ 0645           ; end TASK_8
+ 0645           ;
+ 0645           
+ 0645           ;============================================================================    
+ 0645                    
+ 0645 54494D4520313D20202020202020204C454420504149522031203C50726573732046313E LINE1:                   .ascii   'TIME 1=        LED PAIR 1 <Press F1>'
+ 0669 00                                        .byte    $00 
+ 066A                                           
+ 066A 54494D4520323D20202020202020204C454420504149522032203C50726573732046323E LINE2:                   .ascii   'TIME 2=        LED PAIR 2 <Press F2>'
+ 068E 00                                        .byte    $00 
+ 068F           
+ 068F 2020204D41474E495455444520544F4F204C4152474520202020202020 HIGH:                  .ascii   '   MAGNITUDE TOO LARGE       '
+ 06AC 00                                        .byte    $00                    
+ 06AD                                           
+ 06AD 2020204E4F204449474954532020202020202020202020202020202020 NODIGIT:               .ascii   '   NO DIGITS                 '
+ 06CA 00                                        .byte    $00                            
+ 06CB                                           
+ 06CB 5A45524F204D41474E495455444520494E415050524F50524941544520 ZEROMAG:               .ascii   'ZERO MAGNITUDE INAPPROPRIATE '
+ 06E8 00                                        .byte    $00                                                    
+ 06E9                                           
+ 06E9 2020202020 CLINE:             .ascii       '     '
+ 06EE 00                                        .byte    $00                                                                                                                    
+ 06EF           ;=============================================================================
+ 06EF           ;
+ 06EF           ;    Subroutine Delay_1ms delays for ~1.00ms
+ 06EF           ;
+ 06EF           DELAY_1ms:
+ 06EF CD0262            ldy    #$0262
+ 06F2           INNER:                            ; inside loop
+ 06F2 8D0000            cpy    #0
+ 06F5 2703              beq    EXIT
+ 06F7 03                dey
+ 06F8 20F8              bra    INNER
+ 06FA           EXIT:
+ 06FA 3D                rts                       ; exit DELAY_1ms
+ 06FB           
+ 06FB           ; end subroutine DELAY_1ms
+ 06FB           ;
+ 06FB           ;==============================================================================
+ 06FB           
+ 06FB                     
+ 06FB           ;============================================================================
+ 06FB                   
+                .area interrupt_vectors (abs)
+                          .org                          $FFFE
+ FFFE 0000                .word                         __start

@@ -1,0 +1,115 @@
+;initial Display prompt
+
+;RAM
+.area bss
+
+
+;===============================================================================
+
+
+.area text
+
+
+;intial display upon start up "hub state"
+
+_main::
+
+TOP:  jsr 		INITLCD		 	   ;initalize the LCD	
+	  jsr 		CLRSCREEN		   ;clears the screen
+	  
+	  ldaa		#$00		   ;loads the LCD address 
+	  ldx		#LINE1	   	   ;starting address of string to be displayed
+	  jsr 		OUTSTRING
+	 
+	  ldaa		#$40
+	  ldx		#LINE2	   	   ;starting address of string to be displayed
+	  jsr 		OUTSTRING
+	  
+READDIS:
+	  
+	  jsr 		INITKEY	 	   ;initialize keypad
+	  jsr 		GETCHAR		   ;get character
+	  COMB		$F1
+	  BEQ		F1RESPONSE	   ;branch to F1RESPONSE 
+	  COMB		$F2
+	  BEQ		F2RESPONSE	   ;branch to F2RESPONSE
+	  jsr		CLRSCREEN
+	  ldaa		#$00
+	  ldx		#ERROR
+	  jsr 		OUTSTRING
+	  jsr 		DELAY
+	  bra		TOP
+	  
+	  
+	  
+F1RESPONSE:
+		   		jsr		 	CLRSCREEN
+	  			ldaa		#$00
+	  			ldx			#F1RESPONSE
+	  			jsr 		OUTSTRING
+	  
+	  			LEON:  bra LEON
+				
+
+F2RESPONSE:
+		   		jsr		 	CLRSCREEN
+	  			ldaa		#$00
+	  			ldx			#F2RESPONSE
+	  			jsr 		OUTSTRING
+	  
+	  			LEON:  bra LEON
+;===========================================================================
+	  
+DELAY:
+	  	ldy		#800	  	   ;load acc d with 800
+		
+		LOOP:
+			 	jsr   DELAY_1ms
+				cpy   #$00	   ;compares d to 0
+				beq	  EXIT	   ;if equal to 0 exit
+				dey	  		   ;decrement y
+				bra	  LOOP
+				
+		EXIT:
+			 	rts	  	  	   ;exit DELAY
+	  
+;============================================================================	 
+	 
+LINE1:			.ascii	 'LED pair 1:     <Press F1>'
+				.byte	 $00 
+				
+LINE2:			.ascii	 'LED pair 2:     <Press F2>'
+				.byte	 $00 
+
+ERROR:			.ascii	 'Please enter a valid response'
+				.byte	 $00			
+				
+F1RESPONSE:		.ascii	 'Enter ms delay for LED 1'
+				.byte	 $00	
+							
+F1RESPONSE:		.ascii	 'Enter ms delay for LED 2'
+				.byte	 $00							
+;=============================================================================
+;
+;    Subroutine Delay_1ms delays for ~1.00ms
+;
+DELAY_1ms:
+        ldy    #$0262
+INNER:                            ; inside loop
+        cpy    #0
+        beq    EXIT
+        dey
+        bra    INNER
+EXIT:
+        rts                       ; exit DELAY_1ms
+
+; end subroutine DELAY_1ms
+;
+;==============================================================================
+
+;============================================================================
+	
+.area interrupt_vectors (abs)
+	  .org				$FFFE
+	  .word				__start
+			

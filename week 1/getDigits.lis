@@ -1,0 +1,51 @@
+ 0000           ;read a sequence of digits and store into the buffer
+ 0000           
+ 0000           ; RAM area
+                .area bss
+                
+ 0000           BUFFER::         .blkb 6
+ 0006           COUNT::          .blkb 1
+ 0007           POINTER::        .blkb 2
+ 0009           
+ 0009           ;============================================================================
+ 0009           
+ 0009           _main::
+ 0009           
+ 0009 160000                    jsr INITKEY                                     ;initialize keypad
+ 000C 160000                    jsr FLUSH_BFR                           ;flushes the character input buffer
+ 000F 790006                    clr COUNT                                       
+ 0012 180300000007              movw  #BUFFER,POINTER           ;moves the contents of BUFFER into POINTER
+ 0018                           
+ 0018                           
+ 0018           LOOP:	
+ 0018 00                        bgnd
+ 0019 160000                    jsr     GETCHAR                                 ;the resulting ASCII char is put in accumulator B
+ 001C                           
+ 001C                                                                                           ;code to make sure it is a digit
+ 001C C10A                      CMPB    #$0A                                    ;compares acc b to ent ascii value
+ 001E 2718                      BEQ             DONE                                    ;exits the loop
+ 0020 C130                      CMPB    #$30                                    ;compares acc b to 30
+ 0022 2DF4                      BLT             LOOP                                    ;branch to Loop if less than 30
+ 0024 C139                      CMPB    #$39                                    ;compares acc b to 39
+ 0026 2F02                      BLE             DIGIT                                   ;branches to digit
+ 0028 20EE                      BRA     LOOP                            ;branch always to not digit
+ 002A                           
+ 002A                           
+ 002A           DIGIT:	
+ 002A           		;stab 	BUFFER					;loads the contents of acc B into Buffer
+ 002A FE0007                    ldx POINTER                                             ;loads acc X with pointer
+ 002D 6B00                      stab 0,X                                                ;Stores contents of acc B into the location of the address found in acc X which is POINTER
+ 002F 720006                    inc COUNT
+ 0032 08                        INX
+ 0033 7E0007                    stx POINTER
+ 0036 20E0                      bra LOOP
+ 0038                           
+ 0038           DONE:
+ 0038           
+ 0038 20FE                      bra DONE
+ 003A                           
+ 003A                           
+ 003A                           
+                .area interrupt_vectors (abs)
+                          .org          $FFFE                                              ;at reset vector location,
+ FFFE 0000                .word         __start                                            ;load starting address       

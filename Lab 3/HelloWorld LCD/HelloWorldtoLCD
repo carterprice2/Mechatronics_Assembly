@@ -1,0 +1,12 @@
+
+
+jsr	 INITLCD	;initialize LCD
+jsr	 CURSOR		;show cursor
+
+ldaa #$00		;load accumulator with LCD address
+ldx	 #MESSAGE	;load message in register x
+jsr OUTSTRING
+
+MESSAGE: 	 .ascii	  'hello world'		   ;message to be displayed
+			 .byte	  $00
+

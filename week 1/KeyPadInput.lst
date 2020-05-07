@@ -1,0 +1,83 @@
+WARNING: EXTCODE CODE AREA DO NOT CONTAIN RELOCATED ADDRESSES.
+THIS WILL BE REMEDIED IN A LATER RELEASE.
+--- 0000           
+--- 0000           ; Read number from keypad and display different messages based on number
+--- 0000           
+--- 0000           ; RAM area
+                .area bss
+                
+ 0800            NUM::   .blkb 1
+ 0801            
+ 0801            
+ 0801            ;=================================================================================
+                .area text
+                
+ C055            _main::		  
+ C055            
+ C055  16FE5C                        jsr INITKEY                                         ;initialize keypad
+ C058  16FE67                            jsr     KP_ACTIVE                                       ;turn on keypad
+ C05B                                    
+ C05B  16FC37                            jsr CLRSCREEN                                   ;clears LCD screen
+ C05E  16FB00                            jsr      INITLCD                                        ;initialize LCD
+ C061  16FC61                            jsr      CURSOR                                         ;show cursor
+ C064  16FE71                            jsr  FLUSH_BFR
+ C067                                    
+ C067  00                                bgnd                                                    ;takes values 1-3
+ C068  16FE77                            jsr        GETCHAR                                      ;the resulting ASCII character is placed in accumulator B 
+ C06B  7B0800                            stab   NUM                                              ;stores ASCII Character in NUM
+ C06E  00                                bgnd
+ C06F                                    
+ C06F  B60800                            ldaa   NUM                                              ;load acc a with NUM
+ C072  C630                              ldab   #$30                                             ;load acc with hex30 
+ C074  1816                              sba                                                             ;stubtracts b from a, stores in a
+ C076                                    
+ C076  43                                deca                                                    ;subtract 1 from acc a
+ C077  2708                              beq       DISPLAY1                                      ;if acc a is 0 then jsr Display 1
+ C079  43                                deca  
+ C07A  270F                              beq       DISPLAY2
+ C07C  43                                deca
+ C07D  2716                              beq       DISPLAY3
+ C07F                                    
+ C07F                                    
+ C07F  20FE              SARA:   bra SARA
+ C081            
+ C081            ;=================================================================================
+ C081            ; Subroutine display1
+ C081            
+ C081              DISPLAY1:
+ C081  8600                               ldaa #$00                      ;load accumulator with LCD address
+ C083  CEC09F                             ldx  #MESSAGE1         ;load register x with Message 1
+ C086  16FBFE                             jsr OUTSTRING
+ C089  20F4                               bra SARA
+ C08B                                     
+ C08B            ;================================================================================                        
+ C08B            ;Subroutine 
+ C08B            
+ C08B            DISPLAY2:
+ C08B  8600                               ldaa #$00                      ;load accumulator with LCD address
+ C08D  CEC0AB                             ldx  #MESSAGE2         ;load register x with Message 1
+ C090  16FBFE                             jsr OUTSTRING
+ C093  20EA                               bra SARA
+ C095            ;================================================================================
+ C095            ; subroutine display3
+ C095                                     
+ C095            DISPLAY3:
+ C095  8600                               ldaa #$00                      ;load accumulator with LCD address
+ C097  CEC0B3                             ldx  #MESSAGE3         ;load register x with Message 1
+ C09A  16FBFE                             jsr OUTSTRING
+ C09D  20E0                               bra SARA
+ C09F                                     
+ C09F            ;================================================================================
+ C09F                                     
+ C09F  68656C6C6F20776F726C64 MESSAGE1:   .ascii   'hello world'            ;message to be displayed
+ C0AA  00                                 .byte    $00           
+ C0AB                                     
+ C0AB  77686174207570 MESSAGE2:   .ascii   'what up'                        ;message to be displayed
+ C0B2  00                                 .byte    $00           
+ C0B3                                     
+ C0B3  6865792073617261 MESSAGE3:         .ascii   'hey sara'               ;message to be displayed
+ C0BB  00                                 .byte    $00                    
+ C0BC                                     
+                .area interrupt_vectors (abs)
+                          .org          $FFFE                                              ;at reset vector location,
+ FFFE  C000                .word         __start                                            ;load starting address       

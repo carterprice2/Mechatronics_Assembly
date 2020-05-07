@@ -1,0 +1,20 @@
+.area bss
+
+FIRST::	 	.blkb 01	
+SECOND:: 	.blkb 01
+RESULT::	.blkb 01
+
+.area text
+
+_main::	  movb	  #$04, FIRST
+		  movb	  #$06, SECOND
+		  ldaa	  FIRST
+		  ldab 	  SECOND
+		  aba
+		  staa	  RESULT
+		  
+spin:: bra		  spin
+
+.area interrupt_vectors(abs) 
+	  .org					 $FFFE
+	  .word					 _start 

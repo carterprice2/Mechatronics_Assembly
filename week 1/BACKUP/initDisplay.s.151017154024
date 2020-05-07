@@ -1,0 +1,46 @@
+;initial Display prompt
+
+;RAM
+.area bss
+
+
+;===============================================================================
+
+
+.area text
+
+
+;intial display upon start up "hub state"
+
+_main::
+
+	  jsr 		INITLCD		 	   ;initalize the LCD	
+	  jsr 		CLRSCREEN		   ;clears the screen
+	  
+	  ldaa		#$00		   ;loads the LCD address 
+	  jsr 		CURSOR
+	  jsr 		SETADDR	   	   ;places cursor
+	  ldx		#LINE1	   	   ;starting address of string to be displayed
+	  jsr 		OUTSTRING
+	 
+	  ldaa		#$40
+	  ldx		#LINE2	   	   ;starting address of string to be displayed
+	  jsr 		OUTSTRING
+	  
+	  
+Leon:  bra Leon
+	 
+	 
+LINE1:			.ascii	 'LED pair 1:     <Press F1>'
+				.byte	 $00 
+				
+				
+LINE2:			.ascii	 'LED pair 2:     <Press F2>'
+				.byte	 $00 
+
+;============================================================================
+	
+.area interrupt_vectors (abs)
+	  .org				$FFFE
+	  .word				__start
+			

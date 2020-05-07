@@ -1,0 +1,818 @@
+;Lab 3 code
+;L. Carter Price
+;Sara V. 
+
+
+;Assembler Equates
+
+PORTS        = $00D6              ; output port for LEDs
+DDRS         = $00D7
+LED_MSK_1    = 0b00000011         ; LED_1 output pins
+R_LED_1      = 0b00000001         ; red LED_1 output pin
+G_LED_1      = 0b00000010		  ; green LED_1 output pin
+LED_MSK_2	 = 0b00001100        
+R_LED_2		 = 0b00000100
+G_LED_2		 = 0b00001000
+
+;RAM
+.area bss
+
+
+BACKflag::	    .blkb 1			;backspace flag  NOT USED YET
+DPTR:: 			.blkb 2			;address of next character to be read and displayed
+FIRSTCH::  		.blkb 1         ;first character flag                             
+DLINE1::  		.blkb 1			;display line 1 flag
+DLINE2::		.blkb 1			;display line 2 flag
+L1::			.blkb 1
+L2::			.blkb 1
+F1flag::		.blkb 1
+F2flag::		.blkb 1
+ENTERflag::		.blkb 1
+DIGITflag::		.blkb 1
+BUFFER::		.blkb 6
+POINTER::		.blkb 2 
+COUNT::			.blkb 1
+ERRORflag::		.blkb 1
+FIRSTdig::		.blkb 1
+TEMP::			.blkb 1
+COUNT2::		.blkb 1
+RESULT::		.blkb 2
+NEXT::			.blkb 1
+TICKS_1::    .blkb 2              ; use this space to explain each of your variables
+COUNT_1::    .blkb 2
+DONE_1::     .blkb 1
+TICKS_2::    .blkb 2
+COUNT_2::    .blkb 2
+DONE_2::     .blkb 1
+t1state::    .blkb 1
+t2state::    .blkb 1
+t3state::    .blkb 1
+t4state::    .blkb 1
+t5state::    .blkb 1
+ON_1::		 .blkb 1
+ON_2::		 .blkb 1
+TOOHIGHflag:: .blkb 1
+SHOWflag::	  .blkb 1
+SHOWCOUNT::	  .blkb 2
+NODIGflag::	  .blkb 1
+ZEROflag::	  .blkb 1
+
+.area text
+
+
+_main::	  		movb #$01, L1
+				movb #$01, L2
+	   	  		movb #$01, FIRSTCH
+				movw  #BUFFER,POINTER		;moves the contents of BUFFER into POINTER
+				
+				movw #$03E8, SHOWCOUNT
+				
+				clr    t1state            ; initialize all tasks to state0
+        		clr    t2state
+       			clr    t3state
+				
+				
+				clr    ON_1
+				clr    ON_2
+				
+				movw   #200, TICKS_1      ; set default for TICKS_1
+        		movw   #500, TICKS_2      ; set default for TICKS_2
+			
+				jsr INITLCD
+				jsr CLRSCREEN
+				jsr KP_ACTIVE
+				jsr INITKEY
+				jsr FLUSH_BFR
+	   	
+		TOP:  
+			 
+			  jsr TASK_1			;mastermind
+			  jsr TASK_2			;Keypad Driver
+			  jsr TASK_3			;Display Driver
+			  jsr TASK_4			;pattern_1e
+			  jsr TASK_5			;count LED pair 1
+			  jsr TASK_6			;pattern_2
+			  jsr TASK_7			;count LED pair 2
+			  jsr TASK_8			;delay
+			   bra TOP
+
+;===============================================================================
+
+;MASTERMIND
+
+TASK_1:    	 tst  	L1				;test L1
+			 bne  	Prompt1	
+			 tst  	L2				;test L2 
+			 bne  	Prompt2
+			 tst	SHOWflag
+			 bne 	SHOW
+			 
+			 ldab	TEMP   			;loads TEMP val from keypad		
+			 cmpb 	#$F1	 		;compares accumulator B to see if F1 is pressed
+			 beq  	F1Press
+			 ldab	TEMP
+			 cmpb 	#$F2	 		;compares acc b to see if F2 pressed
+			 lbeq  	F2Press	
+			 
+			 CMPB	#$0A			;compares acc b to ent ascii value
+			 LBEQ	ENTERpress	
+			 CMPB	#$08			;compare acc b to BACKSPACE ascii value
+			 LBEQ	BACKSPACE	
+			 	
+			 CMPB 	#$30			;compares acc b to 30
+			 LBLT	ERROR			;branch to Loop if less than 30
+			 CMPB	#$39			;compares acc b to 39
+			 LBLE	DIGITpress		;branches to digit	
+			 rts
+			 
+			 
+SHOW:		 BGND
+			 ldd	SHOWCOUNT
+			 SUBD	#0001
+			 std	SHOWCOUNT
+			 tst 	SHOWCOUNT
+			 beq    RESETSHOW
+			 rts
+			 
+			 
+			 
+RESETSHOW:	 clr TEMP
+			 clr SHOWflag
+			 movw #1500, SHOWCOUNT
+			 tst F1flag
+			 bne RESETL1
+			 tst F2flag
+			 bne RESETL2
+			 rts
+			 
+RESETL1:	movb #$01, L1
+			clr F1flag
+			clr F2flag
+			rts
+RESETL2:	movb #$01, L2
+			clr F1flag
+			clr F2flag
+			rts
+			 
+Prompt1:
+			 movb #$01, DLINE1      ;set the Display Line 1 flag
+	   	   	 rts
+Prompt2:
+			 movb #$01, DLINE2		;set the Display Line 2 flag
+			 rts
+			 
+F1Press:
+			 
+			 movb #$01, F1flag		;set the f1 flag
+			 movb #$01, FIRSTdig	;sets the first digit flag
+			 ldaa #$08
+			 jsr SETADDR
+			 jsr CURSOR
+	  		 clr F2flag				;clears the f2 flag
+			 clr TEMP
+			 clr COUNT
+			 clr ON_1
+			 clr BUFFER
+			 movw #BUFFER, POINTER
+			 rts
+			 
+F2Press:	 
+			 
+			 movb #$01, F2flag		;set the f2 flag
+			 movb #$01, FIRSTdig	;sets first digit flag
+			 ldaa #$48
+			 jsr SETADDR
+			 jsr CURSOR
+			 clr F1flag				;clears the f2 flag
+			 clr TEMP
+			 clr COUNT
+			 clr ON_2
+			 clr BUFFER
+			 movw #BUFFER,POINTER
+			 rts
+			 
+ENTERpress:	 
+			 tst  FIRSTdig
+			 bne  NODIG
+		   	 movb #$01, ENTERflag
+			 jsr BCD
+			 clr TEMP
+			 rts 
+			 
+NODIG:		 movb #$01, NODIGflag
+			 rts
+			 
+DIGITpress:	 tst F1flag
+			 bne PROCEED
+			 tst F2flag
+			 bne PROCEED
+			 rts
+
+PROCEED:	 movb #$01, DIGITflag
+			 ldab 	COUNT 			;places current LCD address in accumulator A
+			 cmpb	#$05
+			 beq	MAXdig			;clears dig flag so typing stops
+			 rts
+			 
+ERROR:		 rts
+			 
+MAXdig:		 clr DIGITflag
+			 rts 
+			 
+BACKSPACE:	 movb #$01, BACKflag
+			 ldab COUNT
+			 cmpb #$00
+			 beq  NOBS
+			 rts
+			 
+NOBS:		 clr BACKflag
+			 rts
+			 
+BCD:		;ASCII to BCD converter
+				
+				movw  #BUFFER, POINTER
+				movw #$0000, RESULT
+				ldy	 #$0000
+				clra
+				clrb
+				
+		LOOP1:	
+				ldy	  #$000A
+				ldd	  RESULT
+				emul
+				cpy	  #$0000
+				bne  TOOBIG 
+				std RESULT
+				ldx	POINTER
+				ldab 0,X
+				subb #$30
+				clra
+				addd RESULT
+				std RESULT
+				dec	COUNT
+				tst COUNT
+				beq	DONE1
+				inx
+				stx	POINTER
+				bra LOOP1
+				
+TOOBIG:		 	movb #$01, TOOHIGHflag
+				rts
+				
+ZERO:			movb #$01, ZEROflag
+				rts			
+	
+DONE1:			ldd #$0000
+				cpd	RESULT
+				beq ZERO
+				tst F1flag
+				bne	SET1
+				tst F2flag
+				bne	SET2
+				rts
+				
+SET1:			
+				movw #$0000, TICKS_1
+				movw RESULT, TICKS_1
+				movb #$01, ON_1
+				movw #$0000, RESULT
+				clr COUNT
+				rts
+				
+SET2:			
+				movw #$0000, TICKS_2
+				movw RESULT, TICKS_2
+				movb #$01, ON_2
+				movw #$0000, RESULT
+				clr COUNT
+				rts
+;===============================================================================
+
+;Keypad Driver
+
+TASK_2:		  
+			  tst	L$KEY_FLG				;test key available flag
+			  bne	SKIP	
+			  				
+			  jsr	GETCHAR
+			  stab 	TEMP
+	   		
+			
+	SKIP:	  rts		   					;returns to subroutine
+
+;==============================================================================
+
+;DISPLAY Task
+
+TASK_3:	 	 
+			 
+			 
+			 tst DLINE1
+			 lbne initDisplay1	  
+		  	 tst DLINE2
+			 lbne initDisplay2
+			 tst TOOHIGHflag
+			 Lbne HIGHdis
+			 tst NODIGflag
+			 lbne NODIGdis
+			 tst ZEROflag
+			 lbne ZEROdis
+		  	 tst F1flag
+			 bne TOPtime
+			 tst F2flag
+			 bne BOTTOMtime
+			 
+			 rts
+			 
+
+TOPtime:
+			 tst BACKflag
+			 bne BS
+			 tst 	DIGITflag	  ;test Digitflag
+			 beq 	RETURN
+		  	 tst 	FIRSTdig
+			 beq	Ddigit
+	  		 ldaa	#$08		   ;loads the LCD address for top line number
+			 jsr 	Ddigit_1st
+	  		 rts
+			 
+BOTTOMtime:	 tst BACKflag
+			 bne BS
+			 tst 	DIGITflag	  ;test Digitflag
+			 beq 	RETURN
+		  	 tst 	FIRSTdig
+			 beq	Ddigit
+	  		 ldaa	#$48		   ;loads the LCD address for top line number
+			 jsr 	Ddigit_1st
+	  		 rts
+
+Ddigit_1st:	 
+		   	 jsr SETADDR
+			 jsr CURSOR
+			 clr FIRSTdig
+			
+Ddigit:		 ldab TEMP
+			 jsr OUTCHAR
+			 clr TEMP
+	   		 ldx POINTER					;loads acc X with pointer
+			 stab 0,X						;Stores contents of acc B into the location of the address found in acc X which is POINTER
+			 inc COUNT
+			 INX
+			 stx POINTER
+			 clr DIGITflag					;clears the DIGITflag so the program cycles until another digit pressed
+			 rts
+RETURN:		 rts		  
+			
+BS:			 
+			 jsr LOAD_ADDR					;load current address in acc A
+			 SUBA #$01						;subtract 1 from address
+			 jsr SETADDR
+			 jsr CURSOR					
+			 ldab #$20	 					;load space into B
+			 jsr  OUTCHAR				;prints character in B
+			 jsr LOAD_ADDR					;load current address in acc A
+			 SUBA #$01	
+			 jsr SETADDR
+			 jsr CURSOR	
+			 clr BACKflag					;clear the Backspace flag
+			 clr TEMP
+			 ldx POINTER					;load POINTER into X
+			 dex					
+			 clr 0,X						;clears the value stored at the address in X
+			 dec COUNT
+			 DEX
+			 stx POINTER
+			 rts
+			  
+initDisplay1:
+
+	   		 tst 	FIRSTCH 		;test if the first character is true
+	  		 lbeq	DCHAR
+	  		 ldaa	#$00		   ;loads the LCD address 
+	  		 ldx	#LINE1	   	   ;starting address of string to be displayed
+	  		 jsr 	DCHAR_1st
+	  		 lbra 	BOTTOM
+	 
+initDisplay2:
+			 tst 	FIRSTCH 		;test if the first character is true
+	  		 lbeq	DCHAR
+	  		 ldaa	#$40		   ;loads the LCD address 
+	  		 ldx	#LINE2	   	   ;starting address of string to be displayed
+	  		 jsr 	DCHAR_1st
+	  		 lbra 	BOTTOM
+				 
+HIGHdis:	 tst 	F1flag
+			 bne	HIGH1
+			 tst	F2flag
+			 bne	HIGH2
+			 rts
+			 
+	HIGH1:	 tst 	FIRSTCH 		;test if the first character is true
+	  		 beq	DCHAR
+	  		 ldaa	#$08		   ;loads the LCD address 
+	  		 ldx	#HIGH	   	   ;starting address of string to be displayed
+	  		 jsr 	DCHAR_1st
+	  		 bra 	BOTTOM
+			 
+	HIGH2:	 tst 	FIRSTCH 		;test if the first character is true
+	  		 beq	DCHAR
+	  		 ldaa	#$48		   ;loads the LCD address 
+	  		 ldx	#HIGH	   	   ;starting address of string to be displayed
+	  		 jsr 	DCHAR_1st
+	  		 bra 	BOTTOM
+			 
+			 
+NODIGdis:	 tst 	F1flag
+			 bne	NODIG1
+			 tst	F2flag
+			 bne	NODIG2
+			 rts
+			 
+	NODIG1:	 tst 	FIRSTCH 		;test if the first character is true
+	  		 beq	DCHAR
+	  		 ldaa	#$08		   ;loads the LCD address 
+	  		 ldx	#NODIGIT	   	   ;starting address of string to be displayed
+	  		 jsr 	DCHAR_1st
+	  		 bra 	BOTTOM
+			 
+	NODIG2:	 tst 	FIRSTCH 		;test if the first character is true
+	  		 beq	DCHAR
+	  		 ldaa	#$48		   ;loads the LCD address 
+	  		 ldx	#NODIGIT	   	   ;starting address of string to be displayed
+	  		 jsr 	DCHAR_1st
+	  		 bra 	BOTTOM
+			 
+ZEROdis:	 tst 	F1flag
+			 bne	ZERO1
+			 tst	F2flag
+			 bne	ZERO2
+			 rts
+			 
+	ZERO1:	 tst 	FIRSTCH 		;test if the first character is true
+	  		 beq	DCHAR
+	  		 ldaa	#$08		   ;loads the LCD address 
+	  		 ldx	#ZEROMAG	   	;starting address of string to be displayed
+	  		 jsr 	DCHAR_1st
+	  		 bra 	BOTTOM
+			 
+	ZERO2:	 tst 	FIRSTCH 		;test if the first character is true
+	  		 beq	DCHAR
+	  		 ldaa	#$48		   ;loads the LCD address 
+	  		 ldx	#ZEROMAG	   	;starting address of string to be displayed
+	  		 jsr 	DCHAR_1st
+	  		 bra 	BOTTOM
+  
+DCHAR_1st:	STX DPTR   		   ;store contents of X in DPTR
+			jsr SETADDR		   ;set the address of of cursor to current location
+			clr FIRSTCH		   ;clear variable FIRSTCH
+
+	  
+DCHAR:
+	  		ldx DPTR		   ;load x with DPTR
+			ldab 0,x		   ;load acc b with contents of the address located in X
+			beq DONE		   
+			jsr OUTCHAR
+			inx
+			stx DPTR
+					
+BOTTOM:		
+			
+	   		tst FIRSTCH		   ;test if firstchar entered for another string
+			bne DONELINE	   ;branch to done 
+			rts
+			
+DONE:		
+			
+		  	movb #$01, FIRSTCH
+			
+			bra BOTTOM
+			
+DONELINE:	
+		
+			tst L1	   		  ;test L1 
+			bne CL1			  ;branch to CL1 if not 0
+			tst L2			  
+			bne CL2
+			tst TOOHIGHflag
+			bne CHIGH
+			tst NODIGflag
+			bne CNODIG
+			rts
+			
+CL1:		clr L1
+			clr DLINE1
+			rts
+			
+CL2:		clr L2
+			clr DLINE2
+			rts
+			
+CHIGH:		clr TOOHIGHflag
+			movb #$01, SHOWflag
+			rts
+			
+CNODIG:		clr NODIGflag
+			movb #$01, SHOWflag
+			rts  	    		
+
+;=========================================================================
+;=============================================================================
+;
+;    Subroutine TASK_4            ; pattern_1 for LED pair 1
+
+TASK_4: 
+		tst ON_1
+		bne START1
+		rts 
+
+START1:	clr    F1flag
+		ldaa   t1state            ; get current t1state and branch accordingly
+        beq    t1state0
+        deca
+        beq    t1state1
+        deca
+        beq    t1state2
+        deca
+        beq    t1state3
+        deca
+        beq    t1state4
+        deca
+        beq    t1state5
+        deca
+        beq    t1state6
+        rts                       ; undefined state - do nothing but return
+
+t1state0:                         ; init TASK_1
+        bclr   PORTS, LED_MSK_1   ; ensure that LEDs are off when initialized
+        bset   DDRS, LED_MSK_1    ; set LED_MSK_1 pins as PORTS outputs
+        movb   #$01, t1state      ; set next state
+        rts
+
+t1state1:                         ; G, not R
+        bset   PORTS, G_LED_1     ; set state1 pattern on LEDs
+        tst    DONE_1             ; check TASK_1 done flag
+        beq    exit_t1s1          ; if not done, return
+        movb   #$02, t1state      ; if done, set next state
+exit_t1s1:
+        rts
+t1state2:                         ; not G, not R
+        bclr   PORTS, G_LED_1     ; set state2 pattern on LEDs
+        tst    DONE_1             ; check TASK_1 done flag
+        beq    exit_t1s2          ; if not done, return
+        movb   #$03, t1state      ; if done, set next state
+exit_t1s2:
+        rts
+t1state3:                         ; not G, R
+        bset   PORTS, R_LED_1     ; set state3 pattern on LEDs
+        tst    DONE_1             ; check TASK_1 done flag
+		;bgnd
+        beq    exit_t1s3          ; if not done, return
+        movb   #$04, t1state      ; if done, set next state
+exit_t1s3:
+        rts
+t1state4:                         ; not G, not R
+        bclr   PORTS, LED_MSK_1   ; set state4 pattern on LEDs
+        tst    DONE_1             ; check TASK_1 done flag
+        beq    exit_t1s4          ; if not done, return
+        movb   #$05, t1state      ; if done, set next state
+exit_t1s4:
+	     rts
+t1state5:                         ; G, R
+        bset   PORTS, LED_MSK_1   ; set state5 pattern on LEDs
+        tst    DONE_1             ; check TASK_1 done flag
+		;bgnd
+        beq    exit_t1s5          ; if not done, return
+        movb   #$06, t1state      ; if done, set next state
+exit_t1s5:
+        rts
+
+t1state6:                         ; not G, not R
+        bclr   PORTS, LED_MSK_1   ; set state6 pattern on LEDs
+        tst    DONE_1             ; check TASK_1 done flag
+        beq    exit_t1s6          ; if not done, return
+        movb   #$01, t1state      ; if done, set next state
+exit_t1s6:
+        rts
+
+; end TASK_4
+;
+;=============================================================================
+;
+;    Subroutine TASK_5            ; count down LED_1 pair
+
+TASK_5: ldaa   t2state            ; get current t2state and branch accordingly
+        beq    t2state0
+        deca
+        beq    t2state1
+		deca
+		beq	   t2state2
+        rts                       ; undefined state - do nothing but return
+
+t2state0:                         ; initialization for TASK_2
+        clr    DONE_1
+        movb   #$01, t2state      ; set next state
+
+t2state1:                         ; (re)initialize COUNT_1
+        movw   TICKS_1, COUNT_1
+        ldx    COUNT_1
+        dex                       ; decrement COUNT_1
+        stx    COUNT_1            ; store decremented COUNT_1
+        clr    DONE_1
+        movb   #$02, t2state      ; set next state
+        ;rts
+
+t2state2:                         ; count down COUNT_1
+        ldx    COUNT_1
+        beq    setdone_1          ; test to see if COUNT_1 is already zero
+        dex                       ; decrement COUNT_1
+        stx    COUNT_1            ; store decremented COUNT_1
+        bne    exit_t2s2          ; if not done, return
+setdone_1:
+        movb   #$01, DONE_1       ; if done, set DONE_1 flag
+        movb   #$01, t2state      ; set next state
+exit_t2s2:
+        rts
+
+; end TASK_5
+; 
+;=============================================================================
+;    Subroutine TASK_6            ; pattern_2
+
+TASK_6: tst ON_2
+		bne START2
+		rts
+
+START2:	clr    F2flag	
+		ldaa   t4state            ; get current t4state and branch accordingly
+        beq    t4state0
+        deca
+        beq    t4state1
+        deca
+        beq    t4state2
+        deca
+        beq    t4state3
+        deca
+        beq    t4state4
+        deca
+        beq    t4state5
+        deca
+        beq    t4state6
+        rts                       ; undefined state - do nothing but return
+
+t4state0:                         ; init TASK_1
+        bclr   PORTS, LED_MSK_2   ; ensure that LEDs are off when initialized
+        bset   DDRS, LED_MSK_2    ; set LED_MSK_1 pins as PORTS outputs
+        movb   #$01, t4state      ; set next state
+        rts
+
+t4state1:                         ; G, not R
+        bset   PORTS, G_LED_2     ; set state1 pattern on LEDs
+        tst    DONE_2             ; check TASK_1 done flag
+        beq    exit_t4s1          ; if not done, return
+        movb   #$02, t4state      ; if done, set next state
+exit_t4s1:
+        rts
+t4state2:                         ; not G, not R
+        bclr   PORTS, G_LED_2     ; set state2 pattern on LEDs
+        tst    DONE_2             ; check TASK_1 done flag
+        beq    exit_t4s2          ; if not done, return
+        movb   #$03, t4state      ; if done, set next state
+exit_t4s2:
+        rts
+t4state3:                         ; not G, R
+        bset   PORTS, R_LED_2     ; set state3 pattern on LEDs
+        tst    DONE_2             ; check TASK_1 done flag
+		;bgnd
+        beq    exit_t4s3          ; if not done, return
+        movb   #$04, t4state      ; if done, set next state
+exit_t4s3:
+        rts
+t4state4:                         ; not G, not R
+        bclr   PORTS, LED_MSK_2   ; set state4 pattern on LEDs
+        tst    DONE_2             ; check TASK_1 done flag
+        beq    exit_t4s4          ; if not done, return
+        movb   #$05, t4state      ; if done, set next state
+exit_t4s4:
+	     rts
+t4state5:                         ; G, R
+        bset   PORTS, LED_MSK_2   ; set state5 pattern on LEDs
+        tst    DONE_2             ; check TASK_1 done flag
+		;bgnd
+        beq    exit_t4s5          ; if not done, return
+        movb   #$06, t4state      ; if done, set next state
+exit_t4s5:
+        rts
+
+t4state6:                         ; not G, not R
+        bclr   PORTS, LED_MSK_2   ; set state6 pattern on LEDs
+        tst    DONE_2             ; check TASK_1 done flag
+        beq    exit_t4s6          ; if not done, return
+        movb   #$01, t4state      ; if done, set next state
+exit_t4s6:
+        rts
+
+; end TASK_6
+;
+;=============================================================================
+;
+;    Subroutine TASK_7            ; count down LED_2 pair
+
+TASK_7: ldaa   t5state            ; get current t5state and branch accordingly
+        beq    t5state0
+        deca
+        beq    t5state1
+		deca
+		beq	   t5state2
+        rts                       ; undefined state - do nothing but return
+
+t5state0:                         ; initialization for TASK_2
+        clr    DONE_2
+        movb   #$01, t5state      ; set next state
+
+t5state1:                         ; (re)initialize COUNT_2
+        movw   TICKS_2, COUNT_2
+        ldx    COUNT_2
+        dex                       ; decrement COUNT_2
+        stx    COUNT_2            ; store decremented COUNT_2
+        clr    DONE_2
+        movb   #$02, t5state      ; set next state
+        ;rts
+
+t5state2:                         ; count down COUNT_2
+        ldx    COUNT_2
+        beq    setdone_2          ; test to see if COUNT_2 is already zero
+        dex                       ; decrement COUNT_2
+        stx    COUNT_2            ; store decremented COUNT_2
+        bne    exit_t5s2          ; if not done, return
+setdone_2:
+        movb   #$01, DONE_2       ; if done, set DONE_2 flag
+        movb   #$01, t5state      ; set next state
+exit_t5s2:
+        rts
+
+; end TASK_7
+; 
+
+
+;=============================================================================
+;
+;    Subroutine TASK_8            ; delay 1.00ms
+
+TASK_8: ldaa   t3state            ; get current t3state and branch accordingly
+        beq    t3state0
+        deca
+        beq    t3state1
+        rts                       ; undefined state - do nothing but return
+
+t3state0:                         ; initialization for TASK_3
+                                  ; no initialization required
+        movb   #$01, t3state      ; set next state
+        rts
+
+t3state1:
+        jsr    DELAY_1ms
+        rts
+
+; end TASK_8
+;
+
+;============================================================================	 
+	 
+LINE1:			.ascii	 'TIME 1=        LED PAIR 1 <Press F1>'
+				.byte	 $00 
+				
+LINE2:			.ascii	 'TIME 2=        LED PAIR 2 <Press F2>'
+				.byte	 $00 
+
+HIGH:			.ascii	 '   MAGNITUDE TOO LARGE       '
+				.byte	 $00			
+				
+NODIGIT:		.ascii	 '   NO DIGITS                 '
+				.byte	 $00				
+				
+ZEROMAG:		.ascii	 'ZERO MAGNITUDE INAPPROPRIATE '
+				.byte	 $00																	
+;=============================================================================
+;
+;    Subroutine Delay_1ms delays for ~1.00ms
+;
+DELAY_1ms:
+        ldy    #$0262
+INNER:                            ; inside loop
+        cpy    #0
+        beq    EXIT
+        dey
+        bra    INNER
+EXIT:
+        rts                       ; exit DELAY_1ms
+
+; end subroutine DELAY_1ms
+;
+;==============================================================================
+
+	  
+;============================================================================
+	
+.area interrupt_vectors (abs)
+	  .org				$FFFE
+	  .word				__start

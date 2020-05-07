@@ -1,0 +1,24 @@
+WARNING: EXTCODE CODE AREA DO NOT CONTAIN RELOCATED ADDRESSES.
+THIS WILL BE REMEDIED IN A LATER RELEASE.
+                .area bss
+                
+ 0800            FIRST::         .blkb 01                                ; reserved space for addend
+ 0801            SECOND::        .blkb 01                                ; reserved space for augend
+ 0802            RESULT::        .blkb 01                                ; reserved space for result
+ 0803            
+                .area text
+                
+                
+ C055  00        _main::   BGND
+ C056  180B070800                  movb    #$07, FIRST
+ C05B  180B060801                  movb    #$06, SECOND
+ C060  B60800                      ldaa    FIRST
+ C063  F60801                      ldab    SECOND
+ C066  1806                        aba
+ C068  7A0802                      staa    RESULT
+ C06B                              
+ C06B  20FE      spin:: bra                spin
+ C06D            
+                .area interrupt_vectors(abs) 
+                          .org                                   $FFFE
+ FFFE  C000                .word                                  __start 

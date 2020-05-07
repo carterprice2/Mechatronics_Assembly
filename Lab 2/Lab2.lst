@@ -1,0 +1,333 @@
+WARNING: EXTCODE CODE AREA DO NOT CONTAIN RELOCATED ADDRESSES.
+THIS WILL BE REMEDIED IN A LATER RELEASE.
+--- 0000           ;Assembler equates
+--- 0000           
+ 00D6           PORTS        = $00D6              ; output port for LEDs
+ 00D7           DDRS         = $00D7
+ 0003           LED_MSK_1    = 0b00000011         ; LED_1 output pins
+ 0001           R_LED_1      = 0b00000001         ; red LED_1 output pin
+ 0002           G_LED_1      = 0b00000010		  ; green LED_1 output pin
+ 000C           LED_MSK_2	 = 0b00001100        
+ 0004           R_LED_2		 = 0b00000100
+ 0008           G_LED_2		 = 0b00001000
+--- 0000           
+--- 0000           ; RAM area
+                .area bss
+ 0800            TICKS_1::    .blkb 2              ; use this space to explain each of your variables
+ 0802            COUNT_1::    .blkb 2
+ 0804            DONE_1::     .blkb 1
+ 0805            TICKS_2::    .blkb 2
+ 0807            COUNT_2::    .blkb 2
+ 0809            DONE_2::     .blkb 1
+ 080A            t1state::    .blkb 1
+ 080B            t2state::    .blkb 1
+ 080C            t3state::    .blkb 1
+ 080D            t4state::    .blkb 1
+ 080E            t5state::    .blkb 1
+ 080F            
+ 080F            ;code area
+                .area text
+                ;
+                ;==============================================================================
+                ;
+                ;   main program
+                
+ C055            _main::
+ C055            
+ C055  79080A            clr    t1state            ; initialize all tasks to state0
+ C058  79080B            clr    t2state
+ C05B  79080C            clr    t3state
+ C05E            
+ C05E            ;  Normally no code other than that to clear the state variables and call the tasks
+ C05E            ;  repeatedly should be in your main program.  However, this week we will make an 
+ C05E            ;  exception.  The following code will allow the user to set TICKS_1 and TICKS_2 in
+ C05E            ;  the debugger.
+ C05E            
+ C05E  180300C80800         movw   #200, TICKS_1      ; set default for TICKS_1
+ C064  180301F40805         movw   #500, TICKS_2      ; set default for TICKS_2
+ C06A  00                bgnd                      ; stop in DEBUGGER to allow user to alter TICKS
+ C06B            
+ C06B            TOP:    ;bgnd
+ C06B  16C07C                    jsr    TASK_1
+ C06E                            ;bgnd
+ C06E  16C0FC            jsr    TASK_2
+ C071                            ;bgnd
+ C071  16C1FA            jsr    TASK_3
+ C074                            ;bgnd
+ C074  16C13B                    jsr        TASK_4
+ C077  16C1BB                    jsr        TASK_5
+ C07A  20EF              bra    TOP
+ C07C            
+ C07C            ; end main
+ C07C             
+ C07C            ;=============================================================================
+ C07C            ;
+ C07C            ;    Subroutine TASK_1            ; pattern_1
+ C07C            
+ C07C  B6080A    TASK_1: ldaa   t1state            ; get current t1state and branch accordingly
+ C07F  2713              beq    t1state0
+ C081  43                deca
+ C082  271E              beq    t1state1
+ C084  43                deca
+ C085  272A              beq    t1state2
+ C087  43                deca
+ C088  2736              beq    t1state3
+ C08A  43                deca
+ C08B  2742              beq    t1state4
+ C08D  43                deca
+ C08E  274E              beq    t1state5
+ C090  43                deca
+ C091  275A              beq    t1state6
+ C093  3D                rts                       ; undefined state - do nothing but return
+ C094            
+ C094            t1state0:                         ; init TASK_1
+ C094  1D00D603          bclr   PORTS, LED_MSK_1   ; ensure that LEDs are off when initialized
+ C098  1C00D703          bset   DDRS, LED_MSK_1    ; set LED_MSK_1 pins as PORTS outputs
+ C09C  180B01080A         movb   #$01, t1state      ; set next state
+ C0A1  3D                rts
+ C0A2            
+ C0A2            t1state1:                         ; G, not R
+ C0A2  1C00D602          bset   PORTS, G_LED_1     ; set state1 pattern on LEDs
+ C0A6  F70804            tst    DONE_1             ; check TASK_1 done flag
+ C0A9  2705              beq    exit_t1s1          ; if not done, return
+ C0AB  180B02080A         movb   #$02, t1state      ; if done, set next state
+ C0B0            exit_t1s1:
+ C0B0  3D                rts
+ C0B1            t1state2:                         ; not G, not R
+ C0B1  1D00D602          bclr   PORTS, G_LED_1     ; set state2 pattern on LEDs
+ C0B5  F70804            tst    DONE_1             ; check TASK_1 done flag
+ C0B8  2705              beq    exit_t1s2          ; if not done, return
+ C0BA  180B03080A         movb   #$03, t1state      ; if done, set next state
+ C0BF            exit_t1s2:
+ C0BF  3D                rts
+ C0C0            t1state3:                         ; not G, R
+ C0C0  1C00D601          bset   PORTS, R_LED_1     ; set state3 pattern on LEDs
+ C0C4  F70804            tst    DONE_1             ; check TASK_1 done flag
+ C0C7                            ;bgnd
+ C0C7  2705              beq    exit_t1s3          ; if not done, return
+ C0C9  180B04080A         movb   #$04, t1state      ; if done, set next state
+ C0CE            exit_t1s3:
+ C0CE  3D                rts
+ C0CF            t1state4:                         ; not G, not R
+ C0CF  1D00D603          bclr   PORTS, LED_MSK_1   ; set state4 pattern on LEDs
+ C0D3  F70804            tst    DONE_1             ; check TASK_1 done flag
+ C0D6  2705              beq    exit_t1s4          ; if not done, return
+ C0D8  180B05080A         movb   #$05, t1state      ; if done, set next state
+ C0DD            exit_t1s4:
+ C0DD  3D                     rts
+ C0DE            t1state5:                         ; G, R
+ C0DE  1C00D603          bset   PORTS, LED_MSK_1   ; set state5 pattern on LEDs
+ C0E2  F70804            tst    DONE_1             ; check TASK_1 done flag
+ C0E5                            ;bgnd
+ C0E5  2705              beq    exit_t1s5          ; if not done, return
+ C0E7  180B06080A         movb   #$06, t1state      ; if done, set next state
+ C0EC            exit_t1s5:
+ C0EC  3D                rts
+ C0ED            
+ C0ED            t1state6:                         ; not G, not R
+ C0ED  1D00D603          bclr   PORTS, LED_MSK_1   ; set state6 pattern on LEDs
+ C0F1  F70804            tst    DONE_1             ; check TASK_1 done flag
+ C0F4  2705              beq    exit_t1s6          ; if not done, return
+ C0F6  180B01080A         movb   #$01, t1state      ; if done, set next state
+ C0FB            exit_t1s6:
+ C0FB  3D                rts
+ C0FC            
+ C0FC            ; end TASK_1
+ C0FC            ;
+ C0FC            ;=============================================================================
+ C0FC            ;
+ C0FC            ;    Subroutine TASK_2            ; count down LED_1 pair
+ C0FC            
+ C0FC  B6080B    TASK_2: ldaa   t2state            ; get current t2state and branch accordingly
+ C0FF  2707              beq    t2state0
+ C101  43                deca
+ C102  270C              beq    t2state1
+ C104  43                        deca
+ C105  271E                      beq        t2state2
+ C107  3D                rts                       ; undefined state - do nothing but return
+ C108            
+ C108            t2state0:                         ; initialization for TASK_2
+ C108  790804            clr    DONE_1
+ C10B  180B01080B         movb   #$01, t2state      ; set next state
+ C110            
+ C110            t2state1:                         ; (re)initialize COUNT_1
+ C110  180408000802         movw   TICKS_1, COUNT_1
+ C116  FE0802            ldx    COUNT_1
+ C119  09                dex                       ; decrement COUNT_1
+ C11A  7E0802            stx    COUNT_1            ; store decremented COUNT_1
+ C11D  790804            clr    DONE_1
+ C120  180B02080B         movb   #$02, t2state      ; set next state
+ C125                    ;rts
+ C125            
+ C125            t2state2:                         ; count down COUNT_1
+ C125  FE0802            ldx    COUNT_1
+ C128  2706              beq    setdone_1          ; test to see if COUNT_1 is already zero
+ C12A  09                dex                       ; decrement COUNT_1
+ C12B  7E0802            stx    COUNT_1            ; store decremented COUNT_1
+ C12E  260A              bne    exit_t2s2          ; if not done, return
+ C130            setdone_1:
+ C130  180B010804         movb   #$01, DONE_1       ; if done, set DONE_1 flag
+ C135  180B01080B         movb   #$01, t2state      ; set next state
+ C13A            exit_t2s2:
+ C13A  3D                rts
+ C13B            
+ C13B            ; end TASK_2
+ C13B            ; 
+ C13B            ;=============================================================================
+ C13B            ;    Subroutine TASK_4            ; pattern_2
+ C13B            
+ C13B  B6080D    TASK_4: ldaa   t4state            ; get current t4state and branch accordingly
+ C13E  2713              beq    t4state0
+ C140  43                deca
+ C141  271E              beq    t4state1
+ C143  43                deca
+ C144  272A              beq    t4state2
+ C146  43                deca
+ C147  2736              beq    t4state3
+ C149  43                deca
+ C14A  2742              beq    t4state4
+ C14C  43                deca
+ C14D  274E              beq    t4state5
+ C14F  43                deca
+ C150  275A              beq    t4state6
+ C152  3D                rts                       ; undefined state - do nothing but return
+ C153            
+ C153            t4state0:                         ; init TASK_1
+ C153  1D00D60C          bclr   PORTS, LED_MSK_2   ; ensure that LEDs are off when initialized
+ C157  1C00D70C          bset   DDRS, LED_MSK_2    ; set LED_MSK_1 pins as PORTS outputs
+ C15B  180B01080D         movb   #$01, t4state      ; set next state
+ C160  3D                rts
+ C161            
+ C161            t4state1:                         ; G, not R
+ C161  1C00D608          bset   PORTS, G_LED_2     ; set state1 pattern on LEDs
+ C165  F70809            tst    DONE_2             ; check TASK_1 done flag
+ C168  2705              beq    exit_t4s1          ; if not done, return
+ C16A  180B02080D         movb   #$02, t4state      ; if done, set next state
+ C16F            exit_t4s1:
+ C16F  3D                rts
+ C170            t4state2:                         ; not G, not R
+ C170  1D00D608          bclr   PORTS, G_LED_2     ; set state2 pattern on LEDs
+ C174  F70809            tst    DONE_2             ; check TASK_1 done flag
+ C177  2705              beq    exit_t4s2          ; if not done, return
+ C179  180B03080D         movb   #$03, t4state      ; if done, set next state
+ C17E            exit_t4s2:
+ C17E  3D                rts
+ C17F            t4state3:                         ; not G, R
+ C17F  1C00D604          bset   PORTS, R_LED_2     ; set state3 pattern on LEDs
+ C183  F70809            tst    DONE_2             ; check TASK_1 done flag
+ C186                            ;bgnd
+ C186  2705              beq    exit_t4s3          ; if not done, return
+ C188  180B04080D         movb   #$04, t4state      ; if done, set next state
+ C18D            exit_t4s3:
+ C18D  3D                rts
+ C18E            t4state4:                         ; not G, not R
+ C18E  1D00D60C          bclr   PORTS, LED_MSK_2   ; set state4 pattern on LEDs
+ C192  F70809            tst    DONE_2             ; check TASK_1 done flag
+ C195  2705              beq    exit_t4s4          ; if not done, return
+ C197  180B05080D         movb   #$05, t4state      ; if done, set next state
+ C19C            exit_t4s4:
+ C19C  3D                     rts
+ C19D            t4state5:                         ; G, R
+ C19D  1C00D60C          bset   PORTS, LED_MSK_2   ; set state5 pattern on LEDs
+ C1A1  F70809            tst    DONE_2             ; check TASK_1 done flag
+ C1A4                            ;bgnd
+ C1A4  2705              beq    exit_t4s5          ; if not done, return
+ C1A6  180B06080D         movb   #$06, t4state      ; if done, set next state
+ C1AB            exit_t4s5:
+ C1AB  3D                rts
+ C1AC            
+ C1AC            t4state6:                         ; not G, not R
+ C1AC  1D00D60C          bclr   PORTS, LED_MSK_2   ; set state6 pattern on LEDs
+ C1B0  F70809            tst    DONE_2             ; check TASK_1 done flag
+ C1B3  2705              beq    exit_t4s6          ; if not done, return
+ C1B5  180B01080D         movb   #$01, t4state      ; if done, set next state
+ C1BA            exit_t4s6:
+ C1BA  3D                rts
+ C1BB            
+ C1BB            ; end TASK_4
+ C1BB            ;
+ C1BB            ;=============================================================================
+ C1BB            ;
+ C1BB            ;    Subroutine TASK_5            ; count down LED_2 pair
+ C1BB            
+ C1BB  B6080E    TASK_5: ldaa   t5state            ; get current t5state and branch accordingly
+ C1BE  2707              beq    t5state0
+ C1C0  43                deca
+ C1C1  270C              beq    t5state1
+ C1C3  43                        deca
+ C1C4  271E                      beq        t5state2
+ C1C6  3D                rts                       ; undefined state - do nothing but return
+ C1C7            
+ C1C7            t5state0:                         ; initialization for TASK_2
+ C1C7  790809            clr    DONE_2
+ C1CA  180B01080E         movb   #$01, t5state      ; set next state
+ C1CF            
+ C1CF            t5state1:                         ; (re)initialize COUNT_2
+ C1CF  180408050807         movw   TICKS_2, COUNT_2
+ C1D5  FE0807            ldx    COUNT_2
+ C1D8  09                dex                       ; decrement COUNT_2
+ C1D9  7E0807            stx    COUNT_2            ; store decremented COUNT_2
+ C1DC  790809            clr    DONE_2
+ C1DF  180B02080E         movb   #$02, t5state      ; set next state
+ C1E4                    ;rts
+ C1E4            
+ C1E4            t5state2:                         ; count down COUNT_2
+ C1E4  FE0807            ldx    COUNT_2
+ C1E7  2706              beq    setdone_2          ; test to see if COUNT_2 is already zero
+ C1E9  09                dex                       ; decrement COUNT_2
+ C1EA  7E0807            stx    COUNT_2            ; store decremented COUNT_2
+ C1ED  260A              bne    exit_t5s2          ; if not done, return
+ C1EF            setdone_2:
+ C1EF  180B010809         movb   #$01, DONE_2       ; if done, set DONE_2 flag
+ C1F4  180B01080E         movb   #$01, t5state      ; set next state
+ C1F9            exit_t5s2:
+ C1F9  3D                rts
+ C1FA            
+ C1FA            ; end TASK_2
+ C1FA            ; 
+ C1FA            
+ C1FA            
+ C1FA            ;=============================================================================
+ C1FA            ;
+ C1FA            ;    Subroutine TASK_3            ; delay 1.00ms
+ C1FA            
+ C1FA  B6080C    TASK_3: ldaa   t3state            ; get current t3state and branch accordingly
+ C1FD  2704              beq    t3state0
+ C1FF  43                deca
+ C200  2707              beq    t3state1
+ C202  3D                rts                       ; undefined state - do nothing but return
+ C203            
+ C203            t3state0:                         ; initialization for TASK_3
+ C203                                              ; no initialization required
+ C203  180B01080C         movb   #$01, t3state      ; set next state
+ C208  3D                rts
+ C209            
+ C209            t3state1:
+ C209  16C20D            jsr    DELAY_1ms
+ C20C  3D                rts
+ C20D            
+ C20D            ; end TASK_3
+ C20D            ;
+ C20D            ;=============================================================================
+ C20D            ;
+ C20D            ;    Subroutine Delay_1ms delays for ~1.00ms
+ C20D            ;
+ C20D            DELAY_1ms:
+ C20D  CD0262            ldy    #$0262
+ C210            INNER:                            ; inside loop
+ C210  8D0000            cpy    #0
+ C213  2703              beq    EXIT
+ C215  03                dey
+ C216  20F8              bra    INNER
+ C218            EXIT:
+ C218  3D                rts                       ; exit DELAY_1ms
+ C219            
+ C219            ; end subroutine DELAY_1ms
+ C219            ;
+ C219            ;==============================================================================
+ C219            
+ C219            
+                .area interrupt_vectors (abs)
+                        .org    $FFFE             ; at reset vector location
+ FFFE  C000              .word   __start           ; load starting address
+ 10000            
